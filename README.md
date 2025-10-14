@@ -23,9 +23,11 @@ The Wendy extension provides comprehensive integration with the Wendy platform, 
 ![Swift Integration](images/swift-integration.png)
 
 ### Debugging
-- **Debug Configuration Provider**: Automatically creates appropriate debug configurations for your Swift targets
+- **Swift Debugging**: Automatically creates appropriate debug configurations for your Swift targets
+- **Python Debugging**: Full support for Python debugging using debugpy 
 - **Remote Debugging**: Connect to remote WendyOS devices for debugging
-- **LLDB Integration**: Full debugging support using LLDB with breakpoints, variable inspection, and more
+- **LLDB Integration**: Full Swift debugging support using LLDB with breakpoints, variable inspection, and more
+- **Multi-Language Support**: Debug both Swift and Python applications on WendyOS
 
 ![Debugging](images/debugging.png)
 
@@ -36,9 +38,11 @@ The Wendy extension provides comprehensive integration with the Wendy platform, 
 ## Requirements
 
 - Visual Studio Code 1.96.0 or newer
-- Swift for Visual Studio Code extension
+- Swift for Visual Studio Code extension (for Swift development)
+- Python extension for Visual Studio Code (for Python development)
 - Wendy CLI installed and accessible
-- Swift SDK for WendyOS (for debugging)
+- Swift SDK for WendyOS (for Swift debugging)
+- debugpy installed in Python applications (for Python debugging)
 
 ## Installation
 
@@ -64,10 +68,21 @@ This extension contributes the following settings:
 
 ## Debugging Your Applications
 
+### Swift Applications
 1. Make sure you've configured your Swift SDK path via the settings
 2. Select your target device in the Devices panel
-3. Open the Debug panel and select "Debug Wendy Application"
+3. Open the Debug panel and select "Debug [Target] on WendyOS"
 4. Start debugging to deploy and connect to your application
+
+### Python Applications
+1. Install debugpy in your Python application: `pip install debugpy`
+2. Add debugpy server code to your application entry point
+3. Deploy your application to WendyOS
+4. Select your target device in the Devices panel
+5. Open the Debug panel and select "Debug Python on WendyOS"
+6. Start debugging to connect to your running Python application
+
+For detailed Python debugging setup instructions, see [Python Debugging Guide](docs/python-debugging.md).
 
 ## Known Issues
 

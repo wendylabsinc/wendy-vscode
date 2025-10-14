@@ -32,19 +32,19 @@ export class WendyWorkspaceContext implements vscode.Disposable {
   private _onDidChangePackage = new vscode.EventEmitter<WendyFolderContext>();
   private hasWendyFolder = false;
   public readonly onDidChangePackage = this._onDidChangePackage.event;
-  
+
   // Add a new event for when folders are ready
   private _onFoldersReady = new vscode.EventEmitter<void>();
   public readonly onFoldersReady = this._onFoldersReady.event;
-  
+
   // Track whether initial folder setup is complete
   private _initialFoldersReady = false;
   private _initialFolderSetupTimeout: NodeJS.Timeout | null = null;
-  
+
   // Track the initial workspace folders
   private _initialFolderPaths: Set<string> = new Set();
   private _processedFolderPaths: Set<string> = new Set();
-  
+
   // Flag to prevent generating configurations multiple times
   private _generatedConfigurations = false;
 
@@ -63,19 +63,19 @@ export class WendyWorkspaceContext implements vscode.Disposable {
     } else {
       console.log(`[Wendy] No initial workspace folders`);
     }
-    
+
     // Subscribe to Swift workspace events
     context.subscriptions.push(
       this.swift.onDidChangeFolders((event) => this.handleFolderEvent(event))
     );
-    
+
     // Still set a timeout as a fallback, but extend it since we'll likely
     // finish processing folders before this timeout
     this._initialFolderSetupTimeout = setTimeout(() => {
       console.log("[Wendy] Initial folder setup complete (timeout)");
       this.markFoldersReady();
     }, 5000); // 5 second fallback timeout
-    
+
     // Subscribe to our own folders ready event
     this.onFoldersReady(() => {
       console.log(`[Wendy] Folders ready event handler in WendyWorkspaceContext`);
@@ -88,7 +88,7 @@ export class WendyWorkspaceContext implements vscode.Disposable {
     this.folders.length = 0;
     this._onDidChangePackage.dispose();
     this._onFoldersReady.dispose();
-    
+
     if (this._initialFolderSetupTimeout) {
       clearTimeout(this._initialFolderSetupTimeout);
     }
@@ -100,7 +100,7 @@ export class WendyWorkspaceContext implements vscode.Disposable {
   public get initialFoldersReady(): boolean {
     return this._initialFoldersReady;
   }
-  
+
   /**
    * Mark folders as ready and fire the event if not already done
    */
@@ -109,7 +109,7 @@ export class WendyWorkspaceContext implements vscode.Disposable {
       this._initialFoldersReady = true;
       console.log(`[Wendy] Marking folders as ready, found ${this.folders.length} processed folders`);
       this._onFoldersReady.fire();
-      
+
       // Clear the timeout if it's still pending
       if (this._initialFolderSetupTimeout) {
         clearTimeout(this._initialFolderSetupTimeout);
@@ -117,21 +117,21 @@ export class WendyWorkspaceContext implements vscode.Disposable {
       }
     }
   }
-  
+
   /**
    * Check if all initial folders have been processed
    */
   private checkAllFoldersProcessed(): void {
     // If we have no initial folders, or we've processed all of them, we're ready
-    if (this._initialFolderPaths.size === 0 || 
-        this._initialFolderPaths.size === this._processedFolderPaths.size) {
+    if (this._initialFolderPaths.size === 0 ||
+      this._initialFolderPaths.size === this._processedFolderPaths.size) {
       console.log(`[Wendy] All initial folders processed (${this._processedFolderPaths.size}/${this._initialFolderPaths.size})`);
       this.markFoldersReady();
     } else {
       console.log(`[Wendy] Still waiting for folders: ${this._processedFolderPaths.size}/${this._initialFolderPaths.size}`);
     }
   }
-  
+
   /**
    * Generate launch configurations for Wendy projects
    */
@@ -141,7 +141,7 @@ export class WendyWorkspaceContext implements vscode.Disposable {
       console.log(`[Wendy] Already generated configurations, skipping`);
       return;
     }
-    
+
     this._generatedConfigurations = true;
     console.log(`[Wendy] Starting launch configuration generation from WendyWorkspaceContext`);
     
@@ -173,36 +173,58 @@ export class WendyWorkspaceContext implements vscode.Disposable {
         
         // Dump all available WendyFolderContext objects for debugging
         this.folders.forEach((wendyFolder, index) => {
-          console.log(`[Wendy] Context ${index}: ${wendyFolder.swift.folder.fsPath}`);
+          console.log(`[Wendy] Context ${index}: ${wendyFolder.folder.fsPath}`);
         });
         
-        let matchFound = false;
+        let existingMatchFound = false;
         // Find the corresponding WendyFolderContext
-        nextWendyFolder: for (const wendyFolder of this.folders) {
-          console.log(`[Wendy] Comparing paths: ${wendyFolder.swift.folder.fsPath} vs ${folder.uri.fsPath}`);
+        for (const wendyFolder of this.folders) {
+          console.log(`[Wendy] Comparing paths: ${wendyFolder.folder.fsPath} vs ${folder.uri.fsPath}`);
           
-          if (wendyFolder.swift.folder.fsPath !== folder.uri.fsPath) {
-            continue nextWendyFolder;
+          if (wendyFolder.folder.fsPath === folder.uri.fsPath) {
+            existingMatchFound = true;
+            console.log(`[Wendy] Found matching WendyFolderContext, generating configurations`);
+            
+            const result = await makeDebugConfigurations(wendyFolder);
+            console.log(`[Wendy] makeDebugConfigurations result: ${result}`);
+            
+            if (result) {
+              this.output.appendLine(`Added Wendy debug configurations to ${folder.name}`);
+              console.log(`[Wendy] Successfully added configurations to ${folder.name}`);
+              await this.promptRefreshDebugConfigurations();
+            } else {
+              this.output.appendLine(`Wendy configurations already exist or couldn't be added for ${folder.name}`);
+              console.log(`[Wendy] Failed to add configurations to ${folder.name}`);
+            }
+            break;
           }
-          matchFound = true;
-          console.log(`[Wendy] Found matching WendyFolderContext, generating configurations`);
-          
-          const result = await makeDebugConfigurations(wendyFolder.swift);
+        }
+        
+        if (!existingMatchFound) {
+          console.log(`[Wendy] No matching WendyFolderContext found for ${folder.name}`);
+          const newFolder = new WendyFolderContext(undefined, this, folder.uri);
+          this.folders.push(newFolder);
+
+          // Mark this folder as processed
+          const folderPath = folder.uri.fsPath;
+          this._processedFolderPaths.add(folderPath);
+          console.log(`[Wendy] Processed folder: ${folderPath}`);
+
+          // Check if all initial folders are now processed
+          if (this._initialFolderPaths.has(folderPath)) {
+            this.checkAllFoldersProcessed();
+          }
+
+          const result = await makeDebugConfigurations(newFolder);
           console.log(`[Wendy] makeDebugConfigurations result: ${result}`);
-          
+
           if (result) {
             this.output.appendLine(`Added Wendy debug configurations to ${folder.name}`);
             console.log(`[Wendy] Successfully added configurations to ${folder.name}`);
-            await this.promptRefreshDebugConfigurations();
           } else {
             this.output.appendLine(`Wendy configurations already exist or couldn't be added for ${folder.name}`);
             console.log(`[Wendy] Failed to add configurations to ${folder.name}`);
           }
-        }
-        
-        if (!matchFound) {
-          console.log(`[Wendy] No matching WendyFolderContext found for ${folder.name}`);
-          this.output.appendLine(`No WendyFolderContext found for ${folder.name}, cannot create debug configurations`);
         }
       }
     } catch (error) {
@@ -228,9 +250,9 @@ export class WendyWorkspaceContext implements vscode.Disposable {
     }
 
     // Create a new context if one doesn't exist
-    const newFolder = new WendyFolderContext(folder, this);
+    const newFolder = new WendyFolderContext(folder, this, folder.folder);
     this.folders.push(newFolder);
-    
+
     // Mark this folder as processed
     const folderPath = folder.folder.fsPath;
     this._processedFolderPaths.add(folderPath);
@@ -240,7 +262,7 @@ export class WendyWorkspaceContext implements vscode.Disposable {
     if (this._initialFolderPaths.has(folderPath)) {
       this.checkAllFoldersProcessed();
     }
-    
+
     return newFolder;
   }
 
@@ -267,7 +289,7 @@ export class WendyWorkspaceContext implements vscode.Disposable {
       }
       case FolderOperation.remove: {
         // Clean up the WendyFolderContext for the removed folder
-        const wendyFolder = this.folders.find((f) => f.swift === folder);
+        const wendyFolder = this.folders.find((f) => f.swift === folder || f.folder.fsPath === folder.folder.fsPath);
         if (wendyFolder && !this.hasWendyFolder) {
           wendyFolder.dispose();
           this.folders.splice(this.folders.indexOf(wendyFolder), 1);
@@ -292,7 +314,7 @@ export class WendyWorkspaceContext implements vscode.Disposable {
       "Swift package updated. You may need to refresh debug configurations.",
       "Refresh"
     );
-    
+
     if (selection === "Refresh") {
       vscode.commands.executeCommand("workbench.action.reloadWindow");
     }

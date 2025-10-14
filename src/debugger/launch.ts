@@ -5,9 +5,10 @@ import * as vscode from "vscode";
 import { getFolderAndNameSuffix } from "./buildConfig";
 import { WENDY_LAUNCH_CONFIG_TYPE } from "./WendyDebugConfigurationProvider";
 import type * as Swift from "swiftlang.swift-vscode";
+import { WendyFolderContext } from "../WendyFolderContext";
 
 export async function makeDebugConfigurations(
-    context: Swift.FolderContext
+    context: WendyFolderContext
 ): Promise<boolean> {
     console.log(`[Wendy] Checking for debug configurations in folder: ${context.folder.fsPath}`);
     
@@ -35,7 +36,7 @@ export async function makeDebugConfigurations(
         console.log(`[Wendy] No executable products found, skipping`);
         return false;
     }
-    
+
     // Add the new configurations at the beginning of the array
     const newConfigurations = [...wendyConfigurations, ...configurations];
     
@@ -47,10 +48,23 @@ export async function makeDebugConfigurations(
     return true;
 }
 
-async function createExecutableConfigurations(context: Swift.FolderContext) {
+async function createExecutableConfigurations(context: WendyFolderContext) {
     console.log(`[Wendy] Generating debug configurations for folder: ${context.folder.fsPath}`);
+
+    if (context.swift === undefined) {
+        return [
+            {
+                type: WENDY_LAUNCH_CONFIG_TYPE,
+                name: `Debug Python App on WendyOS`,
+                request: "attach",
+                target: context.folder.toString(),
+                cwd: context.folder.fsPath,
+                preLaunchTask: `wendy: Run Python App`
+            }
+        ];
+    }
     
-    const executableProducts = await context.swiftPackage.executableProducts;
+    const executableProducts = await context.swift.swiftPackage.executableProducts;
     console.log(`[Wendy] Found ${executableProducts.length} executable products`);
     
     if (executableProducts.length === 0) {
@@ -59,7 +73,7 @@ async function createExecutableConfigurations(context: Swift.FolderContext) {
 
     // Windows understand the forward slashes, so make the configuration unified as posix path
     // to make it easier for users switching between platforms.
-    const { folder } = getFolderAndNameSuffix(context, undefined, "posix");
+    const { folder } = getFolderAndNameSuffix(context.swift, undefined, "posix");
     console.log(`[Wendy] Using folder path: ${folder}`);
 
     return executableProducts.map(product => {
@@ -86,7 +100,7 @@ export async function hasAnyWendyDebugConfiguration(): Promise<boolean> {
         console.log(`[Wendy] No workspace folders found`);
         return false;
     }
-    
+
     for (const folder of vscode.workspace.workspaceFolders) {
         console.log(`[Wendy] Checking folder: ${folder.name}`);
         const wsLaunchSection = vscode.workspace.getConfiguration("launch", folder.uri);

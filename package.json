@@ -17,13 +17,15 @@
   ],
   "activationEvents": [
     "workspaceContains:Package.swift",
+    "workspaceContains:**/*.py",
     "onDebug",
     "onDebugDynamicConfigurations:wendy",
     "onDebugResolve:wendy"
   ],
   "main": "./dist/extension.js",
   "extensionDependencies": [
-    "swiftlang.swift-vscode"
+    "swiftlang.swift-vscode",
+    "ms-python.debugpy"
   ],
   "contributes": {
     "jsonValidation": [
@@ -212,7 +214,7 @@
             "properties": {
               "target": {
                 "type": "string",
-                "description": "The Swift package target to debug."
+                "description": "The target to debug."
               },
               "cwd": {
                 "type": "string",
