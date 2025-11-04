@@ -8,7 +8,7 @@ import { exec } from 'child_process';
  * A utility for detecting if a workspace folder is an Edge project.
  * This could check various signals:
  * 1. Package.swift dependencies that include Edge libraries
- * 2. Presence of .edge directory or configuration
+ * 2. Presence of edge.json configuration file
  * 3. Output from running `edge info` in the directory
  */
 export class EdgeProjectDetector {
@@ -47,14 +47,13 @@ export class EdgeProjectDetector {
     }
 
     // Method 2: Check for .edge directory or configuration
-    const edgeDirPath = path.join(folderPath, '.edge');
     const edgeConfigPath = path.join(folderPath, 'edge.json');
     try {
-      if (fs.existsSync(edgeDirPath) || fs.existsSync(edgeConfigPath)) {
+      if (fs.existsSync(edgeConfigPath)) {
         return true;
       }
     } catch (error) {
-      console.error(`Error checking for .edge directory or config: ${error}`);
+      console.error(`Error checking for edge.json: ${error}`);
     }
 
     // Method 3: Run edge info command in the directory

@@ -1,19 +1,18 @@
 // Portions of this code taken from the VS Code Swift open source project
 // (https://github.com/vscode‑swift), licensed under Apache 2.0.
 
-import { EdgeFolderContext } from "../EdgeFolderContext";
 import * as vscode from "vscode";
 import { getFolderAndNameSuffix } from "./buildConfig";
 import { EDGE_LAUNCH_CONFIG_TYPE } from "./EdgeDebugConfigurationProvider";
-import { DeviceManager } from "../models/DeviceManager";
+import type * as Swift from "swiftlang.swift-vscode";
 
 export async function makeDebugConfigurations(
-    context: EdgeFolderContext
+    context: Swift.FolderContext
 ): Promise<boolean> {
-    console.log(`[Edge] Checking for debug configurations in folder: ${context.swift.folder.fsPath}`);
+    console.log(`[Edge] Checking for debug configurations in folder: ${context.folder.fsPath}`);
     
     // Get the launch configurations for this folder
-    const wsLaunchSection = vscode.workspace.getConfiguration("launch", context.swift.folder);
+    const wsLaunchSection = vscode.workspace.getConfiguration("launch", context.folder);
     const configurations = wsLaunchSection.get<any[]>("configurations") || [];
     console.log(`[Edge] Found ${configurations.length} existing configurations`);
     
@@ -48,10 +47,10 @@ export async function makeDebugConfigurations(
     return true;
 }
 
-async function createExecutableConfigurations(context: EdgeFolderContext) {
-    console.log(`[Edge] Generating debug configurations for folder: ${context.swift.folder.fsPath}`);
+async function createExecutableConfigurations(context: Swift.FolderContext) {
+    console.log(`[Edge] Generating debug configurations for folder: ${context.folder.fsPath}`);
     
-    const executableProducts = await context.swift.swiftPackage.executableProducts;
+    const executableProducts = await context.swiftPackage.executableProducts;
     console.log(`[Edge] Found ${executableProducts.length} executable products`);
     
     if (executableProducts.length === 0) {
@@ -60,7 +59,7 @@ async function createExecutableConfigurations(context: EdgeFolderContext) {
 
     // Windows understand the forward slashes, so make the configuration unified as posix path
     // to make it easier for users switching between platforms.
-    const { folder, nameSuffix } = getFolderAndNameSuffix(context.swift, undefined, "posix");
+    const { folder, nameSuffix } = getFolderAndNameSuffix(context, undefined, "posix");
     console.log(`[Edge] Using folder path: ${folder}`);
 
     return executableProducts.map(product => {

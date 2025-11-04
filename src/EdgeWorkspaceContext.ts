@@ -149,56 +149,61 @@ export class EdgeWorkspaceContext implements vscode.Disposable {
       const hasExistingEdgeConfig = await hasAnyEdgeDebugConfiguration();
       console.log(`[Edge] Existing Edge configurations found: ${hasExistingEdgeConfig}`);
       
-      if (!hasExistingEdgeConfig && vscode.workspace.workspaceFolders) {
-        console.log(`[Edge] No existing configurations found, checking ${vscode.workspace.workspaceFolders.length} workspace folders`);
+      if (hasExistingEdgeConfig) {
+        console.log(`[Edge] Skipping configuration generation as Edge configurations already exist`);
+        return
+      } else if (!vscode.workspace.workspaceFolders) {
+        console.log(`[Edge] No workspace folders found, skipping configuration generation`);
+        return;
+      }
+
+      console.log(`[Edge] No existing configurations found, checking ${vscode.workspace.workspaceFolders.length} workspace folders`);
+      
+      nextFolder: for (const folder of vscode.workspace.workspaceFolders) {
+        console.log(`[Edge] Checking if folder is an Edge project: ${folder.name} (${folder.uri.fsPath})`);
+        const isEdgeProject = await EdgeProjectDetector.isEdgeProject(folder.uri.fsPath);
+        console.log(`[Edge] Is Edge project: ${isEdgeProject} for folder: ${folder.name}`);
         
-        for (const folder of vscode.workspace.workspaceFolders) {
-          console.log(`[Edge] Checking if folder is an Edge project: ${folder.name} (${folder.uri.fsPath})`);
-          const isEdgeProject = await EdgeProjectDetector.isEdgeProject(folder.uri.fsPath);
-          console.log(`[Edge] Is Edge project: ${isEdgeProject} for folder: ${folder.name}`);
+        if (!isEdgeProject) {
+          continue nextFolder;
+        }
+
+        this.output.appendLine(`Detected Edge project in folder: ${folder.name}`);
+        console.log(`[Edge] Searching for matching EdgeFolderContext in ${this.folders.length} contexts`);
+        
+        // Dump all available EdgeFolderContext objects for debugging
+        this.folders.forEach((edgeFolder, index) => {
+          console.log(`[Edge] Context ${index}: ${edgeFolder.swift.folder.fsPath}`);
+        });
+        
+        let matchFound = false;
+        // Find the corresponding EdgeFolderContext
+        nextEdgeFolder: for (const edgeFolder of this.folders) {
+          console.log(`[Edge] Comparing paths: ${edgeFolder.swift.folder.fsPath} vs ${folder.uri.fsPath}`);
           
-          if (isEdgeProject) {
-            this.output.appendLine(`Detected Edge project in folder: ${folder.name}`);
-            console.log(`[Edge] Searching for matching EdgeFolderContext in ${this.folders.length} contexts`);
-            
-            // Dump all available EdgeFolderContext objects for debugging
-            this.folders.forEach((edgeFolder, index) => {
-              console.log(`[Edge] Context ${index}: ${edgeFolder.swift.folder.fsPath}`);
-            });
-            
-            let matchFound = false;
-            // Find the corresponding EdgeFolderContext
-            for (const edgeFolder of this.folders) {
-              console.log(`[Edge] Comparing paths: ${edgeFolder.swift.folder.fsPath} vs ${folder.uri.fsPath}`);
-              
-              if (edgeFolder.swift.folder.fsPath === folder.uri.fsPath) {
-                matchFound = true;
-                console.log(`[Edge] Found matching EdgeFolderContext, generating configurations`);
-                
-                const result = await makeDebugConfigurations(edgeFolder);
-                console.log(`[Edge] makeDebugConfigurations result: ${result}`);
-                
-                if (result) {
-                  this.output.appendLine(`Added Edge debug configurations to ${folder.name}`);
-                  console.log(`[Edge] Successfully added configurations to ${folder.name}`);
-                } else {
-                  this.output.appendLine(`Edge configurations already exist or couldn't be added for ${folder.name}`);
-                  console.log(`[Edge] Failed to add configurations to ${folder.name}`);
-                }
-                break;
-              }
-            }
-            
-            if (!matchFound) {
-              console.log(`[Edge] No matching EdgeFolderContext found for ${folder.name}`);
-              this.output.appendLine(`No EdgeFolderContext found for ${folder.name}, cannot create debug configurations`);
-            }
+          if (edgeFolder.swift.folder.fsPath !== folder.uri.fsPath) {
+            continue nextEdgeFolder;
+          }
+          matchFound = true;
+          console.log(`[Edge] Found matching EdgeFolderContext, generating configurations`);
+          
+          const result = await makeDebugConfigurations(edgeFolder.swift);
+          console.log(`[Edge] makeDebugConfigurations result: ${result}`);
+          
+          if (result) {
+            this.output.appendLine(`Added Edge debug configurations to ${folder.name}`);
+            console.log(`[Edge] Successfully added configurations to ${folder.name}`);
+            await this.promptRefreshDebugConfigurations();
+          } else {
+            this.output.appendLine(`Edge configurations already exist or couldn't be added for ${folder.name}`);
+            console.log(`[Edge] Failed to add configurations to ${folder.name}`);
           }
         }
-      } else if (hasExistingEdgeConfig) {
-        console.log(`[Edge] Skipping configuration generation as Edge configurations already exist`);
-      } else {
-        console.log(`[Edge] No workspace folders found, skipping configuration generation`);
+        
+        if (!matchFound) {
+          console.log(`[Edge] No matching EdgeFolderContext found for ${folder.name}`);
+          this.output.appendLine(`No EdgeFolderContext found for ${folder.name}, cannot create debug configurations`);
+        }
       }
     } catch (error) {
       console.error(`[Edge] Error generating launch configurations: ${error}`);
@@ -258,12 +263,6 @@ export class EdgeWorkspaceContext implements vscode.Disposable {
 
         // Emit an event indicating the package was updated
         this._onDidChangePackage.fire(edgeFolder);
-
-        // Refresh debug configurations
-        if (!this.hasEdgeFolder) {
-          this.refreshDebugConfigurations();
-        }
-
         break;
       }
       case FolderOperation.remove: {
@@ -274,7 +273,7 @@ export class EdgeWorkspaceContext implements vscode.Disposable {
           this.folders.splice(this.folders.indexOf(edgeFolder), 1);
 
           // Refresh debug configurations after removing a folder
-          this.refreshDebugConfigurations();
+          this.promptRefreshDebugConfigurations();
         }
         break;
       }
@@ -288,7 +287,7 @@ export class EdgeWorkspaceContext implements vscode.Disposable {
   /**
    * Refresh the debug configurations in VS Code
    */
-  private async refreshDebugConfigurations(): Promise<void> {
+  public async promptRefreshDebugConfigurations(): Promise<void> {
     const selection = await vscode.window.showInformationMessage(
       "Swift package updated. You may need to refresh debug configurations.",
       "Refresh"

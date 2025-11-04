@@ -26,6 +26,12 @@
     "swiftlang.swift-vscode"
   ],
   "contributes": {
+    "jsonValidation": [
+      {
+        "fileMatch": "edge.json",
+        "url": "./schemas/edge-schema.json"
+      }
+    ],
     "viewsContainers": {
       "activitybar": [
         {

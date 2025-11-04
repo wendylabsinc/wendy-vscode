@@ -250,22 +250,17 @@ export async function activate(
           // Check if this is an Edge project
           const isEdgeProject = await EdgeProjectDetector.isEdgeProject(folder.folder.fsPath);
           if (isEdgeProject) {
-            // Find the corresponding EdgeFolderContext
-            for (const edgeFolder of edgeWorkspaceContext.folders) {
-              if (edgeFolder.swift === folder) {
-                // Check if there are already Edge configurations for this folder
-                const wsLaunchSection = vscode.workspace.getConfiguration("launch", folder.folder);
-                const configurations = wsLaunchSection.get<any[]>("configurations") || [];
-                const hasEdgeConfigurations = configurations.some(
-                  config => config.type === EDGE_LAUNCH_CONFIG_TYPE
-                );
-                
-                if (!hasEdgeConfigurations) {
-                  await makeDebugConfigurations(edgeFolder);
-                  outputChannel.appendLine(`Added Edge debug configurations to new folder ${folder.folder.fsPath}`);
-                }
-                break;
-              }
+            // Check if there are already Edge configurations for this folder
+            const wsLaunchSection = vscode.workspace.getConfiguration("launch", folder.folder);
+            const configurations = wsLaunchSection.get<any[]>("configurations") || [];
+            const hasEdgeConfigurations = configurations.some(
+              config => config.type === EDGE_LAUNCH_CONFIG_TYPE
+            );
+            
+            if (!hasEdgeConfigurations) {
+              await makeDebugConfigurations(folder);
+              await edgeWorkspaceContext.promptRefreshDebugConfigurations();
+              outputChannel.appendLine(`Added Edge debug configurations to new folder ${folder.folder.fsPath}`);
             }
           }
         }
