@@ -31,17 +31,17 @@ export class DocumentationProvider
   private documentationLinks: DocumentationItem[] = [
     new DocumentationItem(
       "Visit Website",
-      "https://edge.engineer",
+      "https://wendy.sh",
       "globe"
     ),
     new DocumentationItem(
       "Visit Docs",
-      "https://edge.engineer",
+      "https://wendy.sh/docs",
       "book"
     ),
     new DocumentationItem(
       "Visit GitHub",
-      "https://github.com/edgeengineer",
+      "https://github.com/wendylabsinc",
       "github"
     ),
   ];

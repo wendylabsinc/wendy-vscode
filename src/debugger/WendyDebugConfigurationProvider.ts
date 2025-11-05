@@ -1,26 +1,26 @@
 import * as vscode from "vscode";
 import * as path from "path";
-import { EdgeCLI } from "../edge-cli/edge-cli";
-import { EdgeWorkspaceContext } from "../EdgeWorkspaceContext";
+import { WendyCLI } from "../wendy-cli/wendy-cli";
+import { WendyWorkspaceContext } from "../WendyWorkspaceContext";
 import { DeviceManager } from "../models/DeviceManager";
 import { getErrorDescription } from "../utilities/utilities";
 import { realpath } from "fs/promises";
 import * as os from "os";
 
-export const EDGE_LAUNCH_CONFIG_TYPE = "edge";
-// Default debug port used by Edge agent
+export const WENDY_LAUNCH_CONFIG_TYPE = "wendy";
+// Default debug port used by Wendy agent
 export const DEFAULT_DEBUG_PORT = 4242;
 // Debugger type to use - can be "lldb-dap" or "codelldb"
 export type DebuggerType = "lldb-dap" | "codelldb";
 export const DEBUGGER_TYPE: DebuggerType = "lldb-dap";
 
-export class EdgeDebugConfigurationProvider
+export class WendyDebugConfigurationProvider
   implements vscode.DebugConfigurationProvider
 {
   constructor(
     private readonly outputChannel: vscode.OutputChannel,
-    private readonly cli: EdgeCLI,
-    private readonly workspaceContext: EdgeWorkspaceContext,
+    private readonly cli: WendyCLI,
+    private readonly workspaceContext: WendyWorkspaceContext,
     private readonly deviceManager: DeviceManager
   ) {}
 
@@ -37,12 +37,12 @@ export class EdgeDebugConfigurationProvider
 
       for (const product of executableProducts) {
         configs.push({
-          type: EDGE_LAUNCH_CONFIG_TYPE,
-          name: `Debug ${product.name} on EdgeOS`,
+          type: WENDY_LAUNCH_CONFIG_TYPE,
+          name: `Debug ${product.name} on WendyOS`,
           request: "attach",
           target: product.name,
           cwd: folderContext.swift.folder.fsPath,
-          preLaunchTask: `edge: Run ${product.name}`,
+          preLaunchTask: `wendy: Run ${product.name}`,
         });
       }
     }
@@ -77,18 +77,18 @@ export class EdgeDebugConfigurationProvider
     token?: vscode.CancellationToken
   ): Promise<vscode.DebugConfiguration | undefined | null> {
     // Check if Swift SDK path is set
-    const config = vscode.workspace.getConfiguration("edgeos");
+    const config = vscode.workspace.getConfiguration("wendyos");
     let sdkPath = config.get<string>("swiftSdkPath");
 
     if (!sdkPath || sdkPath.trim() === "") {
       const actions = ["Configure Swift SDK Path", "Cancel"];
       const selection = await vscode.window.showErrorMessage(
-        "Swift SDK path is not set. This is required for debugging EdgeOS applications.",
+        "Swift SDK path is not set. This is required for debugging WendyOS applications.",
         ...actions
       );
 
       if (selection === "Configure Swift SDK Path") {
-        await vscode.commands.executeCommand("edge.configureSwiftSdkPath");
+        await vscode.commands.executeCommand("wendy.configureSwiftSdkPath");
       }
 
       return null; // Cancel debugging
@@ -114,7 +114,7 @@ export class EdgeDebugConfigurationProvider
       );
 
       if (selection === "Configure Swift SDK Path") {
-        await vscode.commands.executeCommand("edge.configureSwiftSdkPath");
+        await vscode.commands.executeCommand("wendy.configureSwiftSdkPath");
       }
 
       return null; // Cancel debugging
@@ -125,16 +125,16 @@ export class EdgeDebugConfigurationProvider
     if (!currentDevice) {
       const actions = ["Add Device", "Select Device", "Cancel"];
       const selection = await vscode.window.showErrorMessage(
-        "No EdgeOS device is selected. You must select a device before debugging.",
+        "No WendyOS device is selected. You must select a device before debugging.",
         ...actions
       );
 
       if (selection === "Add Device") {
-        await vscode.commands.executeCommand("edgeDevices.addDevice");
+        await vscode.commands.executeCommand("wendyDevices.addDevice");
       } else if (selection === "Select Device") {
         // Open the devices view to allow selection
         await vscode.commands.executeCommand(
-          "workbench.view.extension.edge-explorer"
+          "workbench.view.extension.wendy-explorer"
         );
       }
 
@@ -144,7 +144,7 @@ export class EdgeDebugConfigurationProvider
     // Build debug target path
     const targetBasePath = path.join(
       folder?.uri.fsPath || "",
-      ".edge-build/debug"
+      ".wendy-build/debug"
     );
 
     // Get the device address and ensure it has the correct debug port
@@ -153,7 +153,7 @@ export class EdgeDebugConfigurationProvider
     // Check the format of the SDK bundle to ensure we're using the right paths
     const sdkSubPath = "";
     const moduleSubPath =
-      "6.1-RELEASE_edgeos_aarch64/aarch64-unknown-linux-gnu/debian-bookworm.sdk/usr/lib/swift_static/linux";
+      "6.1-RELEASE_wendyos_aarch64/aarch64-unknown-linux-gnu/debian-bookworm.sdk/usr/lib/swift_static/linux";
 
     // Create shared SDK path commands for both debugger types
     const sdkPathCommands = [
@@ -177,7 +177,7 @@ export class EdgeDebugConfigurationProvider
         `gdb-remote ${remoteAddress}`,
       ];
 
-      // TODO: Don't hardcode this path - once the Edge CLI is capable of managing the SDK,
+      // TODO: Don't hardcode this path - once the Wendy CLI is capable of managing the SDK,
       // this path will be dynamically generated
       // debugConfiguration.debugAdapterExecutable =
       // ("/Library/Developer/Toolchains/swift-6.1-RELEASE.xctoolchain/usr/bin/lldb-dap");
@@ -201,7 +201,7 @@ export class EdgeDebugConfigurationProvider
 
     // Ensure we have a preLaunchTask to build the target if not specified
     if (!debugConfiguration.preLaunchTask && debugConfiguration.target) {
-      debugConfiguration.preLaunchTask = `edge: Run ${debugConfiguration.target}`;
+      debugConfiguration.preLaunchTask = `wendy: Run ${debugConfiguration.target}`;
     }
 
     // Log configuration to the output channel
@@ -212,14 +212,14 @@ export class EdgeDebugConfigurationProvider
   }
 
   /**
-   * Registers the Edge debug configuration provider with VS Code.
+   * Registers the Wendy debug configuration provider with VS Code.
    */
   public static register(
-    context: EdgeWorkspaceContext,
+    context: WendyWorkspaceContext,
     outputChannel: vscode.OutputChannel,
     deviceManager: DeviceManager
   ): vscode.Disposable[] {
-    const provider = new EdgeDebugConfigurationProvider(
+    const provider = new WendyDebugConfigurationProvider(
       outputChannel,
       context.cli,
       context,
@@ -228,13 +228,13 @@ export class EdgeDebugConfigurationProvider
 
     // Register as both a regular provider (for resolving configurations)
     const regularProvider = vscode.debug.registerDebugConfigurationProvider(
-      EDGE_LAUNCH_CONFIG_TYPE,
+      WENDY_LAUNCH_CONFIG_TYPE,
       provider
     );
 
     // Also register as a dynamic provider (for showing configurations in the UI)
     const dynamicProvider = vscode.debug.registerDebugConfigurationProvider(
-      EDGE_LAUNCH_CONFIG_TYPE,
+      WENDY_LAUNCH_CONFIG_TYPE,
       provider,
       vscode.DebugConfigurationProviderTriggerKind.Dynamic
     );

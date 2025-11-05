@@ -2,17 +2,17 @@ import * as vscode from "vscode";
 import { Device } from "./Device";
 import { v7 as uuidv7 } from "uuid";
 import { exec } from "child_process";
-import { EdgeCLI } from "../edge-cli/edge-cli";
+import { WendyCLI } from "../wendy-cli/wendy-cli";
 
 export interface EthernetDevice {
   displayName: string;
-  isEdgeOSDevice: boolean;
+  isWendyOSDevice: boolean;
   macAddress: string;
   name: string;
 }
 
 export interface USBDevice {
-  isEdgeOSDevice: boolean;
+  isWendyOSDevice: boolean;
   productId: string;
   vendorId: string;
   name: string;
@@ -55,8 +55,8 @@ export interface WifiConnectionResult {
  * Manages devices stored in VS Code configuration
  */
 export class DeviceManager {
-  private static readonly CONFIG_KEY = "edgeos.devices";
-  private static readonly CURRENT_DEVICE_KEY = "edgeos.currentDevice";
+  private static readonly CONFIG_KEY = "wendyos.devices";
+  private static readonly CURRENT_DEVICE_KEY = "wendyos.currentDevice";
   private _onDevicesChanged = new vscode.EventEmitter<void>();
   private devices: Device[] = [];
   private deviceIdsCheckedForUpdates: Set<string> = new Set();
@@ -89,12 +89,12 @@ export class DeviceManager {
     ));
     
     try {
-      const cli = await EdgeCLI.create();
+      const cli = await WendyCLI.create();
       if (!cli) {
         return manuallyAddedDevices;
       }
   
-      // Execute the edge imager list command
+      // Execute the wendy imager list command
       const output = await new Promise<string>((resolve, reject) => {
         exec(`${cli.path} devices --json`, (error, stdout) => {
           if (error) {
@@ -167,9 +167,9 @@ export class DeviceManager {
     }
     this.deviceIdsCheckedForUpdates.add(device.id);
 
-    const cli = await EdgeCLI.create();
+    const cli = await WendyCLI.create();
     if (!cli) {
-      throw new Error("Failed to create Edge CLI");
+      throw new Error("Failed to create Wendy CLI");
     }
 
     const output = await new Promise<string>((resolve, reject) => {
@@ -252,7 +252,7 @@ export class DeviceManager {
       this._onDevicesChanged.fire();
     }
 
-    return new Device(newDevice.id, newDevice.address, "Edge Agent", undefined, "Custom");
+    return new Device(newDevice.id, newDevice.address, "Wendy Agent", undefined, "Custom");
   }
 
   async updateAgent(deviceId: string): Promise<void> {
@@ -261,14 +261,14 @@ export class DeviceManager {
       throw new Error(`Device with ID ${deviceId} not found`);
     }
 
-    const cli = await EdgeCLI.create();
+    const cli = await WendyCLI.create();
     if (!cli) {
-      throw new Error("Failed to create Edge CLI");
+      throw new Error("Failed to create Wendy CLI");
     }
 
     vscode.window.withProgress({
       location: vscode.ProgressLocation.Notification,
-      title: `Updating EdgeOS Agent on ${device.name}`,
+      title: `Updating WendyOS Agent on ${device.name}`,
       cancellable: false,
     }, async () => {
       try {
@@ -305,9 +305,9 @@ export class DeviceManager {
       throw new Error(`Device with ID ${deviceId} not found`);
     }
 
-    const cli = await EdgeCLI.create();
+    const cli = await WendyCLI.create();
     if (!cli) {
-      throw new Error("Failed to create Edge CLI");
+      throw new Error("Failed to create Wendy CLI");
     }
 
     let output = await new Promise<string>((resolve, reject) => {

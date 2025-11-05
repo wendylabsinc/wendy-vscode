@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { Disk } from "./Disk";
-import { EdgeCLI } from "../edge-cli/edge-cli";
-import { spawn, exec } from "child_process";
+import { WendyCLI } from "../wendy-cli/wendy-cli";
+import { exec } from "child_process";
 
 export class DiskManager {
   private outputChannel: vscode.OutputChannel;
@@ -11,12 +11,12 @@ export class DiskManager {
   }
 
   async getDisks(): Promise<Disk[]> {
-    const cli = await EdgeCLI.create();
+    const cli = await WendyCLI.create();
     if (!cli) {
       return [];
     }
 
-    // Execute the edge imager list command
+    // Execute the wendy imager list command
     const output = await new Promise<string>((resolve, reject) => {
       exec(`${cli.path} imager list --json --all`, (error, stdout) => {
         if (error) {
@@ -30,21 +30,21 @@ export class DiskManager {
     return JSON.parse(output);
   }
 
-  async flashEdgeOS(disk: Disk, image: string): Promise<void> {
-    const cli = await EdgeCLI.create();
+  async flashWendyOS(disk: Disk, image: string): Promise<void> {
+    const cli = await WendyCLI.create();
     if (!cli) {
       return;
     }
 
     await vscode.window.withProgress({
       location: vscode.ProgressLocation.Window,
-      title: "Flashing EdgeOS",
+      title: "Flashing WendyOS",
       cancellable: true,
     }, async (progress, token) => {
-      this.outputChannel.appendLine(`Flashing EdgeOS to disk ${disk.id} with image ${image}`);
+      this.outputChannel.appendLine(`Flashing WendyOS to disk ${disk.id} with image ${image}`);
 
       const terminal = vscode.window.createTerminal({
-        name: "EdgeOS Flasher",
+        name: "WendyOS Flasher",
         shellPath: cli.path,
         shellArgs: ["imager", "write-device", image, disk.id, "--force"]
       });

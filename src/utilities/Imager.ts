@@ -1,15 +1,15 @@
 import { exec } from "child_process";
-import { EdgeCLI } from "../edge-cli/edge-cli";
+import { WendyCLI } from "../wendy-cli/wendy-cli";
 
-export class EdgeImager {
+export class WendyImager {
   static async listSupportedDevices(): Promise<string[]> {
-    const cli = await EdgeCLI.create();
+    const cli = await WendyCLI.create();
     if (!cli) {
       return [];
     }
 
     const output = await new Promise<string>((resolve, reject) => {
-      exec(`${cli.path} imager list-devices --json`, (error, stdout, stderr) => {
+      exec(`${cli.path} imager list-devices --json`, (error, stdout) => {
         if (error) {
           reject(error);
         }

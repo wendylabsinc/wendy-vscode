@@ -1,6 +1,6 @@
-# Automated Release Process for Edge VSCode Extension
+# Automated Release Process for Wendy VSCode Extension
 
-This document explains how to use the automated GitHub Actions workflow to release new versions of the Edge VSCode extension.
+This document explains how to use the automated GitHub Actions workflow to release new versions of the Wendy VSCode extension.
 
 ## Release Methods
 

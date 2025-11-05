@@ -2,28 +2,28 @@
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from "vscode";
 import { getErrorDescription } from "./utilities/utilities";
-import { EdgeCLI } from "./edge-cli/edge-cli";
+import { WendyCLI } from "./wendy-cli/wendy-cli";
 import type { SwiftExtensionApi } from "swiftlang.swift-vscode";
-import { EdgeWorkspaceContext } from "./EdgeWorkspaceContext";
-import { EdgeTaskProvider } from "./tasks/EdgeTaskProvider";
+import { WendyWorkspaceContext } from "./WendyWorkspaceContext";
+import { WendyTaskProvider } from "./tasks/WendyTaskProvider";
 import { DocumentationProvider } from "./sidebar/DocumentationProvider";
 import { DevicesProvider } from "./sidebar/DevicesProvider";
 import { DeviceManager } from "./models/DeviceManager";
 import { DiskManager } from "./models/DiskManager";
-import { EdgeDebugConfigurationProvider, EDGE_LAUNCH_CONFIG_TYPE } from "./debugger/EdgeDebugConfigurationProvider";
+import { WendyDebugConfigurationProvider, WENDY_LAUNCH_CONFIG_TYPE } from "./debugger/WendyDebugConfigurationProvider";
 import { DisksProvider } from "./sidebar/DisksProvider";
-import { EdgeImager } from "./utilities/Imager";
-import { EdgeProjectDetector } from "./utilities/EdgeProjectDetector";
-import { makeDebugConfigurations, hasAnyEdgeDebugConfiguration } from "./debugger/launch";
+import { WendyImager } from "./utilities/Imager";
+import { WendyProjectDetector } from "./utilities/WendyProjectDetector";
+import { makeDebugConfigurations, hasAnyWendyDebugConfiguration } from "./debugger/launch";
 
 export async function activate(
   context: vscode.ExtensionContext
 ): Promise<void> {
   try {
-    const outputChannel = vscode.window.createOutputChannel("EdgeOS");
+    const outputChannel = vscode.window.createOutputChannel("WendyOS");
     context.subscriptions.push(outputChannel);
     outputChannel.appendLine(
-      "Activating EdgeOS extension for Visual Studio Code..."
+      "Activating WendyOS extension for Visual Studio Code..."
     );
 
     // If we're developing the extension, focus the output channel
@@ -37,25 +37,25 @@ export async function activate(
 
     // Register the devices provider
     const devicesProvider = new DevicesProvider(deviceManager);
-    vscode.window.registerTreeDataProvider("edgeDevices", devicesProvider);
+    vscode.window.registerTreeDataProvider("wendyDevices", devicesProvider);
 
     // Register the disks provider
     const disksProvider = new DisksProvider(diskManager);
-    vscode.window.registerTreeDataProvider("edgeDisks", disksProvider);
+    vscode.window.registerTreeDataProvider("wendyDisks", disksProvider);
 
     devicesProvider.autorefresh();
     disksProvider.autorefresh();
 
     // Register device-related commands
     context.subscriptions.push(
-      vscode.commands.registerCommand("edgeDevices.refreshDevices", () => {
+      vscode.commands.registerCommand("wendyDevices.refreshDevices", () => {
         devicesProvider.refresh();
       }),
 
-      vscode.commands.registerCommand("edgeDevices.addDevice", async () => {
+      vscode.commands.registerCommand("wendyDevices.addDevice", async () => {
         const address = await vscode.window.showInputBox({
           placeHolder: "hostname or hostname:port",
-          prompt: "Enter the address of the Edge device",
+          prompt: "Enter the address of the Wendy device",
         });
 
         if (address) {
@@ -73,7 +73,7 @@ export async function activate(
       }),
 
       vscode.commands.registerCommand(
-        "edgeDevices.deleteDevice",
+        "wendyDevices.deleteDevice",
         async (item) => {
           if (item?.device) {
             const confirmed = await vscode.window.showWarningMessage(
@@ -99,7 +99,7 @@ export async function activate(
       ),
 
       vscode.commands.registerCommand(
-        "edgeDevices.connectWifi",
+        "wendyDevices.connectWifi",
         async (item) => {
           if (item?.device) {
             try {
@@ -114,7 +114,7 @@ export async function activate(
       ),
 
       vscode.commands.registerCommand(
-        "edgeDevices.updateAgent",
+        "wendyDevices.updateAgent",
         async (item) => {
           if (item?.device) {
             await deviceManager.updateAgent(item.device.id);
@@ -123,7 +123,7 @@ export async function activate(
       ),
 
       vscode.commands.registerCommand(
-        "edgeDevices.selectDevice",
+        "wendyDevices.selectDevice",
         async (item) => {
           if (item?.device) {
             try {
@@ -141,14 +141,14 @@ export async function activate(
       ),
 
       vscode.commands.registerCommand(
-        "edgeDisks.refreshDisks",
+        "wendyDisks.refreshDisks",
         () => {
           disksProvider.refresh();
         }
       ),
 
       vscode.commands.registerCommand(
-        "edgeDisks.flashDisk",
+        "wendyDisks.flashDisk",
         async (item) => {
           if (!item || !item.disk) {
             return;
@@ -165,7 +165,7 @@ export async function activate(
             return;
           }
 
-          const supportedDevices = await EdgeImager.listSupportedDevices();
+          const supportedDevices = await WendyImager.listSupportedDevices();
           const selectedImage = await vscode.window.showQuickPick(
             supportedDevices,
             {
@@ -179,21 +179,21 @@ export async function activate(
           }
 
           try {
-            await diskManager.flashEdgeOS(item.disk, selectedImage);
+            await diskManager.flashWendyOS(item.disk, selectedImage);
           } catch (error) {
             vscode.window.showErrorMessage(
-              `Failed to flash EdgeOS: ${getErrorDescription(error)}`
+              `Failed to flash WendyOS: ${getErrorDescription(error)}`
             );
           }
         }
       ),
 
       vscode.commands.registerCommand(
-        "edge.configureSwiftSdkPath",
+        "wendy.configureSwiftSdkPath",
         async () => {
           await vscode.commands.executeCommand(
             "workbench.action.openSettings",
-            "edgeos.swiftSdkPath"
+            "wendyos.swiftSdkPath"
           );
         }
       )
@@ -202,16 +202,16 @@ export async function activate(
     // Register the documentation provider
     const documentationProvider = new DocumentationProvider();
     vscode.window.registerTreeDataProvider(
-      "edgeDocumentation",
+      "wendyDocumentation",
       documentationProvider
     );
 
     // Listen for configuration changes to the CLI path
     context.subscriptions.push(
       vscode.workspace.onDidChangeConfiguration((e) => {
-        if (e.affectsConfiguration("edgeos.cliPath")) {
+        if (e.affectsConfiguration("wendyos.cliPath")) {
           const message =
-            "EdgeOS: CLI path has been changed. Reload window for changes to take effect.";
+            "WendyOS: CLI path has been changed. Reload window for changes to take effect.";
           vscode.window
             .showInformationMessage(message, "Reload Window")
             .then((selection) => {
@@ -247,20 +247,20 @@ export async function activate(
         if (folder && operation === 'add') {
           outputChannel.appendLine(`Folder added: ${folder.folder.fsPath}`);
           
-          // Check if this is an Edge project
-          const isEdgeProject = await EdgeProjectDetector.isEdgeProject(folder.folder.fsPath);
-          if (isEdgeProject) {
-            // Check if there are already Edge configurations for this folder
+          // Check if this is an Wendy project
+          const isWendyProject = await WendyProjectDetector.isWendyProject(folder.folder.fsPath);
+          if (isWendyProject) {
+            // Check if there are already Wendy configurations for this folder
             const wsLaunchSection = vscode.workspace.getConfiguration("launch", folder.folder);
             const configurations = wsLaunchSection.get<any[]>("configurations") || [];
-            const hasEdgeConfigurations = configurations.some(
-              config => config.type === EDGE_LAUNCH_CONFIG_TYPE
+            const hasWendyConfigurations = configurations.some(
+              config => config.type === WENDY_LAUNCH_CONFIG_TYPE
             );
             
-            if (!hasEdgeConfigurations) {
+            if (!hasWendyConfigurations) {
               await makeDebugConfigurations(folder);
-              await edgeWorkspaceContext.promptRefreshDebugConfigurations();
-              outputChannel.appendLine(`Added Edge debug configurations to new folder ${folder.folder.fsPath}`);
+              await wendyWorkspaceContext.promptRefreshDebugConfigurations();
+              outputChannel.appendLine(`Added Wendy debug configurations to new folder ${folder.folder.fsPath}`);
             }
           }
         }
@@ -269,56 +269,56 @@ export async function activate(
     context.subscriptions.push(folderChangeDisposable);
     outputChannel.appendLine("Listening for Swift folder changes...");
 
-    const edgeCLI = await EdgeCLI.create();
-    if (!edgeCLI) {
-      const config = vscode.workspace.getConfiguration("edgeos");
+    const wendyCLI = await WendyCLI.create();
+    if (!wendyCLI) {
+      const config = vscode.workspace.getConfiguration("wendyos");
       const configuredPath = config.get<string>("cliPath");
 
       const options = ["Configure Path", "View Installation Instructions"];
       const choice = await vscode.window.showErrorMessage(
         configuredPath && configuredPath.trim() !== ""
-          ? `The configured Edge CLI path "${configuredPath}" is not accessible or executable.`
-          : "Unable to automatically discover your Edge CLI installation.",
+          ? `The configured Wendy CLI path "${configuredPath}" is not accessible or executable.`
+          : "Unable to automatically discover your Wendy CLI installation.",
         ...options
       );
 
       if (choice === "Configure Path") {
         await vscode.commands.executeCommand(
           "workbench.action.openSettings",
-          "edgeos.cliPath"
+          "wendyos.cliPath"
         );
       } else if (choice === "View Installation Instructions") {
         vscode.env.openExternal(
           vscode.Uri.parse(
-            "https://github.com/apache-edge/edge-agent/blob/main/README.md"
+            "https://github.com/wendylabsinc/wendy-agent/blob/main/README.md"
           )
         );
       }
       return;
     }
 
-    outputChannel.appendLine(`Discovered Edge CLI at path: ${edgeCLI.path}`);
-    outputChannel.appendLine(`Edge CLI version: ${edgeCLI.version}`);
+    outputChannel.appendLine(`Discovered Wendy CLI at path: ${wendyCLI.path}`);
+    outputChannel.appendLine(`Wendy CLI version: ${wendyCLI.version}`);
 
-    // Create the EdgeWorkspaceContext with all the necessary components
-    const edgeWorkspaceContext = new EdgeWorkspaceContext(
+    // Create the WendyWorkspaceContext with all the necessary components
+    const wendyWorkspaceContext = new WendyWorkspaceContext(
       context,
       outputChannel,
-      edgeCLI,
+      wendyCLI,
       swiftAPI.workspaceContext
     );
 
-    // Store the EdgeWorkspaceContext in the extension context for later use
-    context.subscriptions.push(edgeWorkspaceContext);
+    // Store the WendyWorkspaceContext in the extension context for later use
+    context.subscriptions.push(wendyWorkspaceContext);
 
     // Register the task provider
     context.subscriptions.push(
-      EdgeTaskProvider.register(edgeWorkspaceContext, deviceManager)
+      WendyTaskProvider.register(wendyWorkspaceContext, deviceManager)
     );
 
     // Register the debug configuration providers
-    const debugProviders = EdgeDebugConfigurationProvider.register(
-      edgeWorkspaceContext,
+    const debugProviders = WendyDebugConfigurationProvider.register(
+      wendyWorkspaceContext,
       outputChannel,
       deviceManager
     );
@@ -326,7 +326,7 @@ export async function activate(
 
     // Add command to refresh debug configurations
     const refreshDebugConfigsCommand = vscode.commands.registerCommand(
-      "edge.refreshDebugConfigurations",
+      "wendy.refreshDebugConfigurations",
       () => {
         vscode.commands.executeCommand("workbench.action.debug.configure");
       }
@@ -334,7 +334,7 @@ export async function activate(
     context.subscriptions.push(refreshDebugConfigsCommand);
 
     // Check if Swift SDK path is set
-    const config = vscode.workspace.getConfiguration("edgeos");
+    const config = vscode.workspace.getConfiguration("wendyos");
     const sdkPath = config.get<string>("swiftSdkPath");
     if (!sdkPath || sdkPath.trim() === "") {
       outputChannel.appendLine(
@@ -345,25 +345,25 @@ export async function activate(
       const actions = ["Configure Now", "Later"];
       vscode.window
         .showWarningMessage(
-          "EdgeOS Swift SDK path is not set. This is required for debugging EdgeOS applications.",
+          "WendyOS Swift SDK path is not set. This is required for debugging WendyOS applications.",
           ...actions
         )
         .then((selection) => {
           if (selection === "Configure Now") {
-            vscode.commands.executeCommand("edge.configureSwiftSdkPath");
+            vscode.commands.executeCommand("wendy.configureSwiftSdkPath");
           }
         });
     }
 
-    // Note: Launch configuration generation is now handled directly in EdgeWorkspaceContext
+    // Note: Launch configuration generation is now handled directly in WendyWorkspaceContext
     // The configurations will be generated automatically when all folders are ready
-    console.log(`[Edge] Configuration generation handled by EdgeWorkspaceContext`);
+    console.log(`[Wendy] Configuration generation handled by WendyWorkspaceContext`);
 
-    outputChannel.appendLine("EdgeOS extension activated successfully.");
+    outputChannel.appendLine("WendyOS extension activated successfully.");
   } catch (error) {
     const errorMessage = getErrorDescription(error);
     vscode.window.showErrorMessage(
-      `Activating Edge extension failed: ${errorMessage}`
+      `Activating Wendy extension failed: ${errorMessage}`
     );
   }
 }

@@ -1,12 +1,12 @@
 import * as vscode from "vscode";
 import type * as Swift from "swiftlang.swift-vscode";
-import { EdgeWorkspaceContext } from "../EdgeWorkspaceContext";
-import { EdgeFolderContext } from "../EdgeFolderContext";
+import { WendyWorkspaceContext } from "../WendyWorkspaceContext";
+import { WendyFolderContext } from "../WendyFolderContext";
 import { DeviceManager } from "../models/DeviceManager";
-import { EdgeCLI } from "../edge-cli/edge-cli";
+import { WendyCLI } from "../wendy-cli/wendy-cli";
 import * as cp from "child_process";
 
-export const EDGE_TASK_TYPE = "edge";
+export const WENDY_TASK_TYPE = "wendy";
 
 // This should match the TaskConfig interface in package.json
 interface TaskConfig extends vscode.TaskDefinition {
@@ -15,9 +15,9 @@ interface TaskConfig extends vscode.TaskDefinition {
 }
 
 /**
- * Custom terminal for executing Edge CLI tasks
+ * Custom terminal for executing Wendy CLI tasks
  */
-class EdgeTaskTerminal implements vscode.Pseudoterminal {
+class WendyTaskTerminal implements vscode.Pseudoterminal {
   private writeEmitter = new vscode.EventEmitter<string>();
   onDidWrite: vscode.Event<string> = this.writeEmitter.event;
 
@@ -27,7 +27,7 @@ class EdgeTaskTerminal implements vscode.Pseudoterminal {
   private process: cp.ChildProcess | undefined;
 
   constructor(
-    private readonly cli: EdgeCLI,
+    private readonly cli: WendyCLI,
     private readonly args: string[],
     private readonly cwd: string
   ) {}
@@ -51,7 +51,7 @@ class EdgeTaskTerminal implements vscode.Pseudoterminal {
     });
 
     this.process.on("close", (code) => {
-      this.writeEmitter.fire(`\r\nEdge process exited with code ${code}\r\n`);
+      this.writeEmitter.fire(`\r\nWendy process exited with code ${code}\r\n`);
       this.closeEmitter.fire(code || 0);
     });
 
@@ -69,17 +69,17 @@ class EdgeTaskTerminal implements vscode.Pseudoterminal {
   }
 }
 
-export class EdgeTaskProvider implements vscode.TaskProvider {
+export class WendyTaskProvider implements vscode.TaskProvider {
   private deviceManager: DeviceManager;
-  private edgeCLI: EdgeCLI;
+  private wendyCLI: WendyCLI;
 
   constructor(
-    private workspaceContext: EdgeWorkspaceContext,
+    private workspaceContext: WendyWorkspaceContext,
     deviceManager?: DeviceManager
   ) {
     // The device manager can be injected for testing, or we'll create one
     this.deviceManager = deviceManager || new DeviceManager();
-    this.edgeCLI = workspaceContext.cli;
+    this.wendyCLI = workspaceContext.cli;
   }
 
   async provideTasks(token: vscode.CancellationToken): Promise<vscode.Task[]> {
@@ -98,10 +98,10 @@ export class EdgeTaskProvider implements vscode.TaskProvider {
 
   createRunTasks(
     product: Swift.Product,
-    folderContext: EdgeFolderContext
+    folderContext: WendyFolderContext
   ): vscode.Task[] {
     const config: TaskConfig = {
-      type: EDGE_TASK_TYPE,
+      type: WENDY_TASK_TYPE,
       args: ["run", "--detach", product.name],
       cwd: folderContext.swift.folder,
     };
@@ -110,7 +110,7 @@ export class EdgeTaskProvider implements vscode.TaskProvider {
       config,
       vscode.TaskScope.Workspace,
       `Run ${product.name}`,
-      "edge",
+      "wendy",
       new vscode.CustomExecution(
         async (
           resolvedDefinition: vscode.TaskDefinition
@@ -124,7 +124,7 @@ export class EdgeTaskProvider implements vscode.TaskProvider {
             args.push("--agent", currentDevice.address);
           }
 
-          const runtime = vscode.workspace.getConfiguration("edgeos").get<string>("runtime");
+          const runtime = vscode.workspace.getConfiguration("wendyos").get<string>("runtime");
           if(runtime) {
             args.push("--runtime", runtime);
           }
@@ -132,7 +132,7 @@ export class EdgeTaskProvider implements vscode.TaskProvider {
           // Add --debug parameter for debugging
           args.push("--debug");
 
-          return new EdgeTaskTerminal(this.edgeCLI, args, config.cwd.fsPath);
+          return new WendyTaskTerminal(this.wendyCLI, args, config.cwd.fsPath);
         }
       )
     );
@@ -146,7 +146,7 @@ export class EdgeTaskProvider implements vscode.TaskProvider {
     token: vscode.CancellationToken
   ): Promise<vscode.Task> {
     // Only handle our own task type
-    if (task.definition.type !== EDGE_TASK_TYPE) {
+    if (task.definition.type !== WENDY_TASK_TYPE) {
       return task;
     }
 
@@ -173,8 +173,8 @@ export class EdgeTaskProvider implements vscode.TaskProvider {
           // Add --debug parameter for debugging
           args.push("--debug");
 
-          return new EdgeTaskTerminal(
-            this.edgeCLI,
+          return new WendyTaskTerminal(
+            this.wendyCLI,
             args,
             definition.cwd.fsPath
           );
@@ -185,14 +185,14 @@ export class EdgeTaskProvider implements vscode.TaskProvider {
   }
 
   /**
-   * Registers the Edge task provider with VS Code.
+   * Registers the Wendy task provider with VS Code.
    * @param context
    */
   public static register(
-    context: EdgeWorkspaceContext,
+    context: WendyWorkspaceContext,
     deviceManager?: DeviceManager
   ): vscode.Disposable {
-    const provider = new EdgeTaskProvider(context, deviceManager);
-    return vscode.tasks.registerTaskProvider(EDGE_TASK_TYPE, provider);
+    const provider = new WendyTaskProvider(context, deviceManager);
+    return vscode.tasks.registerTaskProvider(WENDY_TASK_TYPE, provider);
   }
 }

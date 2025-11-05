@@ -108,7 +108,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: extension-vsix
-          path: edge-vscode-${{ env.NEW_VERSION }}.vsix
+          path: wendy-vscode-${{ env.NEW_VERSION }}.vsix
           retention-days: 7
 
       - name: Display manual upload instructions
@@ -120,5 +120,5 @@ jobs:
           echo "To complete the release:"
           echo "1. Download the VSIX artifact from the Actions tab"
           echo "2. Upload it manually to the VS Code Marketplace at:"
-          echo "   https://marketplace.visualstudio.com/manage/publishers/edge-engineer"
+          echo "   https://marketplace.visualstudio.com/manage/publishers/wendylabsinc"
           echo "======================================================" 
