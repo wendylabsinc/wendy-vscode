@@ -2,7 +2,7 @@
   "name": "wendy-vscode",
   "displayName": "Wendy",
   "description": "Build and debug WendyOS applications with Visual Studio Code",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "publisher": "wendylabsinc",
   "repository": {
     "type": "git",
