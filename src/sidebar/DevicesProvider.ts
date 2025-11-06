@@ -25,7 +25,7 @@ export class DeviceTreeItem extends vscode.TreeItem {
     this.id = device.id;
     // Add a command to select this device when clicked
     this.command = {
-      command: "edgeDevices.selectDevice",
+      command: "wendyDevices.selectDevice",
       title: "Select Device",
       arguments: [this],
     };

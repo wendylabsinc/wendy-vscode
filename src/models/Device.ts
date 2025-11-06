@@ -1,5 +1,5 @@
 /**
- * Represents an Edge device that can be connected to
+ * Represents a Wendy device that can be connected to.
  */
 export class Device {
   constructor(
@@ -19,7 +19,7 @@ export class Device {
     public readonly name: string,
 
     /**
-     * Version of the EdgeOS agent running on the device
+     * Version of the WendyOS agent running on the device
      */
     public readonly agentVersion: string | undefined,
 

@@ -1,12 +1,12 @@
 {
-  "name": "edge-vscode",
-  "displayName": "Edge Engineer",
-  "description": "Build and debug EdgeOS applications with Visual Studio Code",
-  "version": "0.0.6",
-  "publisher": "edge-engineer",
+  "name": "wendy-vscode",
+  "displayName": "Wendy",
+  "description": "Build and debug WendyOS applications with Visual Studio Code",
+  "version": "0.0.12",
+  "publisher": "wendylabsinc",
   "repository": {
     "type": "git",
-    "url": "https://github.com/edgeengineer/edge-vscode"
+    "url": "https://github.com/wendylabsinc/wendy-vscode"
   },
   "icon": "resources/icon.png",
   "engines": {
@@ -18,8 +18,8 @@
   "activationEvents": [
     "workspaceContains:Package.swift",
     "onDebug",
-    "onDebugDynamicConfigurations:edge",
-    "onDebugResolve:edge"
+    "onDebugDynamicConfigurations:wendy",
+    "onDebugResolve:wendy"
   ],
   "main": "./dist/extension.js",
   "extensionDependencies": [
@@ -28,153 +28,157 @@
   "contributes": {
     "jsonValidation": [
       {
-        "fileMatch": "edge.json",
-        "url": "./schemas/edge-schema.json"
+        "fileMatch": "wendy.json",
+        "url": "./schemas/wendy-schema.json"
       }
     ],
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "edge-explorer",
-          "title": "Edge",
-          "icon": "resources/logo.svg"
+          "id": "wendy-explorer",
+          "title": "Wendy",
+          "icon": "resources/activity_bar_icon_dark.png",
+          "iconTheme": {
+            "light": "resources/activity_bar_icon_light.png",
+            "dark": "resources/activity_bar_icon_dark.png"
+          }
         }
       ]
     },
     "views": {
-      "edge-explorer": [
+      "wendy-explorer": [
         {
-          "id": "edgeDevices",
+          "id": "wendyDevices",
           "name": "Devices"
         },
         {
-          "id": "edgeDisks",
+          "id": "wendyDisks",
           "name": "Disks"
         },
         {
-          "id": "edgeDocumentation",
+          "id": "wendyDocumentation",
           "name": "Documentation"
         }
       ]
     },
     "commands": [
       {
-        "command": "edgeDevices.addDevice",
+        "command": "wendyDevices.addDevice",
         "title": "Add Device",
         "icon": "$(add)"
       },
       {
-        "command": "edgeDevices.refreshDevices",
+        "command": "wendyDevices.refreshDevices",
         "title": "Refresh Devices",
         "icon": "$(refresh)"
       },
       {
-        "command": "edgeDevices.deleteDevice",
+        "command": "wendyDevices.deleteDevice",
         "title": "Remove Device",
         "icon": "$(trash)"
       },
       {
-        "command": "edgeDevices.connectWifi",
+        "command": "wendyDevices.connectWifi",
         "title": "Connect to WiFi",
         "icon": "$(link)"
       },
       {
-        "command": "edgeDevices.updateAgent",
+        "command": "wendyDevices.updateAgent",
         "title": "Update Agent",
         "icon": "$(sync)"
       },
       {
-        "command": "edgeDevices.selectDevice",
+        "command": "wendyDevices.selectDevice",
         "title": "Set as Current Device",
         "icon": "$(check)"
       },
       {
-        "command": "edgeDisks.flashDisk",
+        "command": "wendyDisks.flashDisk",
         "title": "Flash Disk",
         "icon": "$(zap)"
       },
       {
-        "command": "edgeDisks.refreshDisks",
+        "command": "wendyDisks.refreshDisks",
         "title": "Refresh Disks",
         "icon": "$(refresh)"
       },
       {
-        "command": "edge.refreshDebugConfigurations",
+        "command": "wendy.refreshDebugConfigurations",
         "title": "Refresh Debug Configurations",
-        "category": "Edge"
+        "category": "Wendy"
       },
       {
-        "command": "edge.configureSwiftSdkPath",
+        "command": "wendy.configureSwiftSdkPath",
         "title": "Configure Swift SDK Path",
-        "category": "Edge"
+        "category": "Wendy"
       }
     ],
     "menus": {
       "view/title": [
         {
-          "command": "edgeDevices.addDevice",
-          "when": "view == edgeDevices",
+          "command": "wendyDevices.addDevice",
+          "when": "view == wendyDevices",
           "group": "navigation"
         },
         {
-          "command": "edgeDevices.refreshDevices",
-          "when": "view == edgeDevices",
+          "command": "wendyDevices.refreshDevices",
+          "when": "view == wendyDevices",
           "group": "navigation"
         },
         {
-          "command": "edgeDisks.refreshDisks",
-          "when": "view == edgeDisks",
+          "command": "wendyDisks.refreshDisks",
+          "when": "view == wendyDisks",
           "group": "navigation"
         }
       ],
       "view/item/context": [
         {
-          "command": "edgeDevices.deleteDevice",
-          "when": "view == edgeDevices && viewItem =~ /device/ && viewItem =~ /Custom/",
+          "command": "wendyDevices.deleteDevice",
+          "when": "view == wendyDevices && viewItem =~ /device/ && viewItem =~ /Custom/",
           "group": "inline"
         },
         {
-          "command": "edgeDevices.updateAgent",
-          "when": "view == edgeDevices && viewItem =~ /device/"
+          "command": "wendyDevices.updateAgent",
+          "when": "view == wendyDevices && viewItem =~ /device/"
         },
         {
-          "command": "edgeDevices.selectDevice",
-          "when": "view == edgeDevices && viewItem =~ /device/ && !(viewItem =~ /current/)",
+          "command": "wendyDevices.selectDevice",
+          "when": "view == wendyDevices && viewItem =~ /device/ && !(viewItem =~ /current/)",
           "group": "inline"
         },
         {
-          "command": "edgeDisks.flashDisk",
-          "when": "view == edgeDisks && viewItem == disk",
+          "command": "wendyDisks.flashDisk",
+          "when": "view == wendyDisks && viewItem == disk",
           "group": "inline"
         }
       ]
     },
     "configuration": {
-      "title": "EdgeOS",
+      "title": "WendyOS",
       "properties": {
-        "edgeos.runtime": {
+        "wendyos.runtime": {
           "type": "string",
           "default": "containerd",
           "enum": [
             "containerd",
             "docker"
           ],
-          "description": "The runtime to use when deploying to EdgeOS. This can be either `containerd` or `docker`"
+          "description": "The runtime to use when deploying to WendyOS. This can be either `containerd` or `docker`"
         },
-        "edgeos.cliPath": {
+        "wendyos.cliPath": {
           "type": "string",
           "default": "",
-          "description": "Path to the Edge CLI executable. Leave empty for automatic detection."
+          "description": "Path to the Wendy CLI executable. Leave empty for automatic detection."
         },
-        "edgeos.swiftSdkPath": {
+        "wendyos.swiftSdkPath": {
           "type": "string",
-          "default": "~/.swiftpm/swift-sdks/6.1-RELEASE_edgeos_aarch64.artifactbundle",
-          "description": "Path to the EdgeOS Swift SDK artifact bundle. Required for debugging. This setting will be removed once the Edge CLI is capable of managing the SDK. This MUST point to the installation location of the 6.1-RELEASE_edgeos_aarch64 SDK."
+          "default": "~/.swiftpm/swift-sdks/6.1-RELEASE_wendyos_aarch64.artifactbundle",
+          "description": "Path to the WendyOS Swift SDK artifact bundle. Required for debugging. This setting will be removed once the Wendy CLI is capable of managing the SDK. This MUST point to the installation location of the 6.1-RELEASE_wendyos_aarch64 SDK."
         },
-        "edgeos.devices": {
+        "wendyos.devices": {
           "type": "array",
           "default": [],
-          "description": "List of Edge devices",
+          "description": "List of Wendy devices",
           "items": {
             "type": "object",
             "properties": {
@@ -189,17 +193,17 @@
             }
           }
         },
-        "edgeos.currentDevice": {
+        "wendyos.currentDevice": {
           "type": "string",
           "default": null,
-          "description": "ID of the currently selected Edge device"
+          "description": "ID of the currently selected Wendy device"
         }
       }
     },
     "debuggers": [
       {
-        "type": "edge",
-        "label": "EdgeOS Debugger",
+        "type": "wendy",
+        "label": "WendyOS Debugger",
         "configurationAttributes": {
           "attach": {
             "required": [
@@ -216,7 +220,7 @@
               },
               "agent": {
                 "type": "string",
-                "description": "The Edge agent address (hostname:port) to connect to."
+                "description": "The Wendy agent address (hostname:port) to connect to."
               },
               "preLaunchTask": {
                 "type": "string",
@@ -263,9 +267,9 @@
         },
         "initialConfigurations": [
           {
-            "type": "edge",
+            "type": "wendy",
             "request": "attach",
-            "name": "Debug Edge Application",
+            "name": "Debug Wendy Application",
             "target": "${workspaceFolderBasename}",
             "cwd": "${workspaceFolder}"
           }
@@ -274,13 +278,13 @@
     ],
     "taskDefinitions": [
       {
-        "type": "edge",
+        "type": "wendy",
         "required": [
           "args"
         ],
         "properties": {
           "args": {
-            "description": "The arguments to pass to the Edge CLI.",
+            "description": "The arguments to pass to the Wendy CLI.",
             "type": "array",
             "items": {
               "type": "string"
@@ -306,7 +310,8 @@
     "pretest": "npm run compile-tests && npm run compile && npm run lint",
     "check-types": "tsc --noEmit",
     "lint": "eslint src",
-    "test": "vscode-test"
+    "test": "vscode-test",
+    "publish:vscode": "bash ./scripts/publish.sh"
   },
   "devDependencies": {
     "@types/mocha": "^10.0.10",
