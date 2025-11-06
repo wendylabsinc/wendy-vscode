@@ -24,6 +24,15 @@ export interface LANDevice {
   hostname: string;
   port: number;
   agentVersion: string | undefined;
+  interfaceType?: string;
+  isWendyDevice?: boolean;
+  apps?: LANDeviceApp[];
+}
+
+export interface LANDeviceApp {
+  name: string;
+  version?: string;
+  bundleIdentifier?: string;
 }
 
 export interface DeviceList {
@@ -61,6 +70,7 @@ export class DeviceManager {
   private devices: Device[] = [];
   private deviceIdsCheckedForUpdates: Set<string> = new Set();
   private currentDevice: Device | undefined;
+  private lanDeviceDetails: Map<string, LANDevice> = new Map();
   readonly onDevicesChanged = this._onDevicesChanged.event;
 
   private _onCurrentDeviceChanged = new vscode.EventEmitter<
@@ -106,12 +116,14 @@ export class DeviceManager {
       
       // Parse the JSON output
       const deviceList: DeviceList = JSON.parse(output);
-      
+      const nextLanDeviceDetails = new Map<string, LANDevice>();
+
       let foundDevices: Device[] = [];
 
       // TODO: Add ethernet and usb devices
 
       for (const lanDevice of deviceList.lanDevices) {
+        nextLanDeviceDetails.set(lanDevice.id, lanDevice);
         foundDevices.push(new Device(
           lanDevice.id,
           lanDevice.hostname,
@@ -122,6 +134,7 @@ export class DeviceManager {
       }
 
       const devices = [...foundDevices, ...manuallyAddedDevices];
+      this.lanDeviceDetails = nextLanDeviceDetails;
       this.devices = devices;
       const currentDevice = this.getCurrentDevice();
       if(currentDevice) {
@@ -137,6 +150,10 @@ export class DeviceManager {
       }
       return manuallyAddedDevices;
     }
+  }
+
+  getLanDeviceDetails(deviceId: string): LANDevice | undefined {
+    return this.lanDeviceDetails.get(deviceId);
   }
 
   /**
