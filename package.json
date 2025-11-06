@@ -2,7 +2,7 @@
   "name": "wendy-vscode",
   "displayName": "Wendy",
   "description": "Build and debug WendyOS applications with Visual Studio Code",
-  "version": "0.0.11",
+  "version": "0.0.12",
   "publisher": "wendylabsinc",
   "repository": {
     "type": "git",
@@ -37,7 +37,8 @@
         {
           "id": "wendy-explorer",
           "title": "Wendy",
-          "icon": {
+          "icon": "resources/activity_bar_icon_dark.png",
+          "iconTheme": {
             "light": "resources/activity_bar_icon_light.png",
             "dark": "resources/activity_bar_icon_dark.png"
           }
