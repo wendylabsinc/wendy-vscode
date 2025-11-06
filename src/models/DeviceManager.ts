@@ -94,7 +94,7 @@ export class DeviceManager {
         return manuallyAddedDevices;
       }
   
-      // Execute the wendy imager list command
+      // Execute the wendy discover command with a single --json output flag
       const output = await new Promise<string>((resolve, reject) => {
         exec(`${cli.path} discover --json`, (error, stdout) => {
           if (error) {
