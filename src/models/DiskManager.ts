@@ -46,7 +46,7 @@ export class DiskManager {
       const terminal = vscode.window.createTerminal({
         name: "WendyOS Flasher",
         shellPath: cli.path,
-        shellArgs: ["imager", "write-device", image, disk.id, "--force"]
+        shellArgs: ["os", "install", image, disk.id, "--force"]
       });
 
       terminal.show();
