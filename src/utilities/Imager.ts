@@ -9,7 +9,7 @@ export class WendyImager {
     }
 
     const output = await new Promise<string>((resolve, reject) => {
-      exec(`${cli.path} imager list-devices --json`, (error, stdout) => {
+      exec(`${cli.path} os supported-devices --json`, (error, stdout) => {
         if (error) {
           reject(error);
         }

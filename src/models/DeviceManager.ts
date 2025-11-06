@@ -96,7 +96,7 @@ export class DeviceManager {
   
       // Execute the wendy imager list command
       const output = await new Promise<string>((resolve, reject) => {
-        exec(`${cli.path} devices --json`, (error, stdout) => {
+        exec(`${cli.path} discover --json`, (error, stdout) => {
           if (error) {
             reject(error);
           }
