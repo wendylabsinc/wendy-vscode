@@ -18,8 +18,7 @@ export type DebuggerType = "lldb-dap" | "codelldb";
 export const DEBUGGER_TYPE: DebuggerType = "lldb-dap";
 
 export class WendyDebugConfigurationProvider
-  implements vscode.DebugConfigurationProvider
-{
+  implements vscode.DebugConfigurationProvider {
   constructor(
     private readonly outputChannel: vscode.OutputChannel,
     private readonly cli: WendyCLI,
@@ -31,7 +30,9 @@ export class WendyDebugConfigurationProvider
     folder: vscode.WorkspaceFolder | undefined,
     token?: vscode.CancellationToken
   ): Promise<vscode.DebugConfiguration[]> {
+    this.outputChannel.appendLine("Providing Wendy debug configurations...");
     if (!folder) {
+      this.outputChannel.appendLine("No workspace folder found.");
       return [];
     }
 
@@ -73,7 +74,7 @@ export class WendyDebugConfigurationProvider
         name: "Debug Python App on WendyOS",
         request: "attach",
         target: "Python App",
-        cwd: folder?.uri.fsPath,
+        cwd: folder?.uri.path,
         preLaunchTask: "wendy: Run Python App",
       }
     ];
@@ -112,29 +113,30 @@ export class WendyDebugConfigurationProvider
   /**
    * Ensure the address includes port 4242 for debugging
    */
-  private ensureDebugPort(address: string): string {
+  private ensureDebugPort(address: string, port: number): string {
     // Check if address already includes a port
     if (address.includes(":")) {
       // Extract host and port
       const [host, port] = address.split(":");
 
       // If port is already 4242, return as is
-      if (port === DEFAULT_DEBUG_PORT.toString()) {
+      if (port === port.toString()) {
         return address;
       }
 
-      return `${host}:${DEFAULT_DEBUG_PORT}`;
+      return `${host}:${port}`;
     }
 
     // No port specified, append the default debug port
-    return `${address}:${DEFAULT_DEBUG_PORT}`;
+    return `${address}:${port}`;
   }
 
   async selectCurrentDevice(
-    folder: vscode.WorkspaceFolder | undefined
+    folder: vscode.WorkspaceFolder | undefined,
+    port: number
   ): Promise<null | string> {
     // Check if a device is selected
-    const currentDevice = await this.deviceManager.getCurrentDevice();
+    const currentDevice = this.deviceManager.getCurrentDevice();
     if (!currentDevice) {
       const actions = ["Add Device", "Select Device", "Cancel"];
       const selection = await vscode.window.showErrorMessage(
@@ -155,7 +157,7 @@ export class WendyDebugConfigurationProvider
     }
 
     // Get the device address and ensure it has the correct debug port
-    return this.ensureDebugPort(currentDevice.address);
+    return this.ensureDebugPort(currentDevice.address, port);
   }
 
   async resolveDebugConfigurationWithSubstitutedVariables(
@@ -208,8 +210,15 @@ export class WendyDebugConfigurationProvider
     debugConfiguration: vscode.DebugConfiguration,
     token?: vscode.CancellationToken
   ): Promise<vscode.DebugConfiguration | undefined | null> {
-    const remoteAddress = await this.selectCurrentDevice(folder);
+    // Wait for launch to be ready
+    // Try to discover a TCP connection on port 5678
+    this.outputChannel.appendLine("Waiting for Python debug server to be ready...");
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+
+    this.outputChannel.appendLine("Resolving Python debug configuration...");
+    const remoteAddress = await this.selectCurrentDevice(folder, DEFAULT_DEBUGPY_PORT);
     if (!remoteAddress) {
+      this.outputChannel.appendLine("No remote address found.");
       return null; // Cancel debugging
     }
 
@@ -283,7 +292,7 @@ export class WendyDebugConfigurationProvider
       return null; // Cancel debugging
     }
 
-    const remoteAddress = await this.selectCurrentDevice(folder);
+    const remoteAddress = await this.selectCurrentDevice(folder, DEFAULT_DEBUG_PORT);
     if (!remoteAddress) {
       return null; // Cancel debugging
     }
@@ -296,8 +305,9 @@ export class WendyDebugConfigurationProvider
 
     // Check the format of the SDK bundle to ensure we're using the right paths
     const sdkSubPath = "";
+    // TODO: Detect SDK structure dynamically, instead of assuming Swift 6.2.1 layout
     const moduleSubPath =
-      "6.1-RELEASE_wendyos_aarch64/aarch64-unknown-linux-gnu/debian-bookworm.sdk/usr/lib/swift_static/linux";
+      "6.2.1-RELEASE_wendyos_aarch64/aarch64-unknown-linux-gnu/debian-bookworm.sdk/usr/lib/swift_static/linux";
 
     // Create shared SDK path commands for both debugger types
     const sdkPathCommands = [

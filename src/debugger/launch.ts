@@ -11,27 +11,18 @@ export async function makeDebugConfigurations(
     context: WendyFolderContext
 ): Promise<boolean> {
     console.log(`[Wendy] Checking for debug configurations in folder: ${context.folder.fsPath}`);
-    
+
     // Get the launch configurations for this folder
     const wsLaunchSection = vscode.workspace.getConfiguration("launch", context.folder);
-    const configurations = wsLaunchSection.get<any[]>("configurations") || [];
+    let configurations = wsLaunchSection.get<any[]>("configurations") || [];
+    configurations = configurations.filter(config => config.type !== WENDY_LAUNCH_CONFIG_TYPE);
+
     console.log(`[Wendy] Found ${configurations.length} existing configurations`);
-    
-    // Check if there are already Wendy configurations
-    const hasWendyConfigurations = configurations.some(
-        config => config.type === WENDY_LAUNCH_CONFIG_TYPE
-    );
-    
-    // If there are already Wendy configurations, don't add more
-    if (hasWendyConfigurations) {
-        console.log(`[Wendy] Wendy configurations already exist, skipping`);
-        return false;
-    }
-    
+
     // Create Wendy debug configurations for each executable
     const wendyConfigurations = await createExecutableConfigurations(context);
     console.log(`[Wendy] Generated ${wendyConfigurations.length} new Wendy configurations`);
-    
+
     if (wendyConfigurations.length === 0) {
         console.log(`[Wendy] No executable products found, skipping`);
         return false;
@@ -39,12 +30,12 @@ export async function makeDebugConfigurations(
 
     // Add the new configurations at the beginning of the array
     const newConfigurations = [...wendyConfigurations, ...configurations];
-    
+
     // Update the launch.json
     console.log(`[Wendy] Updating launch.json with ${wendyConfigurations.length} Wendy configurations`);
     await wsLaunchSection.update("configurations", newConfigurations, vscode.ConfigurationTarget.WorkspaceFolder);
     console.log(`[Wendy] Successfully updated launch.json`);
-    
+
     return true;
 }
 
@@ -57,16 +48,16 @@ async function createExecutableConfigurations(context: WendyFolderContext) {
                 type: WENDY_LAUNCH_CONFIG_TYPE,
                 name: `Debug Python App on WendyOS`,
                 request: "attach",
-                target: context.folder.toString(),
+                target: context.folder.path,
                 cwd: context.folder.fsPath,
                 preLaunchTask: `wendy: Run Python App`
             }
         ];
     }
-    
+
     const executableProducts = await context.swift.swiftPackage.executableProducts;
     console.log(`[Wendy] Found ${executableProducts.length} executable products`);
-    
+
     if (executableProducts.length === 0) {
         return [];
     }
@@ -95,7 +86,7 @@ async function createExecutableConfigurations(context: WendyFolderContext) {
  */
 export async function hasAnyWendyDebugConfiguration(): Promise<boolean> {
     console.log(`[Wendy] Checking if any folder has Wendy debug configurations`);
-    
+
     if (!vscode.workspace.workspaceFolders) {
         console.log(`[Wendy] No workspace folders found`);
         return false;
@@ -105,13 +96,13 @@ export async function hasAnyWendyDebugConfiguration(): Promise<boolean> {
         console.log(`[Wendy] Checking folder: ${folder.name}`);
         const wsLaunchSection = vscode.workspace.getConfiguration("launch", folder.uri);
         const configurations = wsLaunchSection.get<any[]>("configurations") || [];
-        
+
         if (configurations.some(config => config.type === WENDY_LAUNCH_CONFIG_TYPE)) {
             console.log(`[Wendy] Found Wendy configuration in folder: ${folder.name}`);
             return true;
         }
     }
-    
+
     console.log(`[Wendy] No Wendy configurations found in any folder`);
     return false;
 }

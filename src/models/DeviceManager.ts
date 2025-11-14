@@ -93,7 +93,7 @@ export class DeviceManager {
       if (!cli) {
         return manuallyAddedDevices;
       }
-  
+
       // Execute the wendy discover command with a single --json output flag
       const output = await new Promise<string>((resolve, reject) => {
         exec(`${cli.path} discover --json`, (error, stdout) => {
@@ -173,7 +173,7 @@ export class DeviceManager {
     }
 
     const output = await new Promise<string>((resolve, reject) => {
-      exec(`${cli.path} agent version --agent ${device.address} --json --check-updates --prerelease`, (error, stdout) => {
+      exec(`${cli.path} device version --agent ${device.address} --json --check-updates --prerelease`, (error, stdout) => {
         if (error) {
           reject(error);
         }
