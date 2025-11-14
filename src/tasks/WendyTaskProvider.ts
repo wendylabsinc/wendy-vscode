@@ -30,7 +30,7 @@ class WendyTaskTerminal implements vscode.Pseudoterminal {
     private readonly cli: WendyCLI,
     private readonly args: string[],
     private readonly cwd: string
-  ) {}
+  ) { }
 
   open(): void {
     this.writeEmitter.fire(
@@ -72,24 +72,31 @@ class WendyTaskTerminal implements vscode.Pseudoterminal {
 export class WendyTaskProvider implements vscode.TaskProvider {
   private deviceManager: DeviceManager;
   private wendyCLI: WendyCLI;
+  private hasPythonExtension: boolean;
 
   constructor(
     private workspaceContext: WendyWorkspaceContext,
-    deviceManager?: DeviceManager
+    deviceManager?: DeviceManager,
+    _options?: { hasPythonExtension: boolean }
   ) {
     // The device manager can be injected for testing, or we'll create one
     this.deviceManager = deviceManager || new DeviceManager();
     this.wendyCLI = workspaceContext.cli;
+    this.hasPythonExtension = _options?.hasPythonExtension || false;
   }
 
   async provideTasks(token: vscode.CancellationToken): Promise<vscode.Task[]> {
     const tasks: vscode.Task[] = [];
 
     for (const folderContext of this.workspaceContext.folders) {
-      const executableProducts = await folderContext.swift.swiftPackage
-        .executableProducts;
-      for (const product of executableProducts) {
-        tasks.push(...this.createRunTasks(product, folderContext));
+      if (folderContext.swift) {
+        const executableProducts = await folderContext.swift.swiftPackage
+          .executableProducts;
+        for (const product of executableProducts) {
+          tasks.push(...this.createSwiftRunTasks(product, folderContext));
+        }
+      } else if (this.hasPythonExtension) {
+        tasks.push(...this.createPythonRunTask(folderContext));
       }
     }
 
@@ -97,19 +104,13 @@ export class WendyTaskProvider implements vscode.TaskProvider {
   }
 
   createRunTasks(
-    product: Swift.Product,
-    folderContext: WendyFolderContext
+    config: TaskConfig,
+    name: string
   ): vscode.Task[] {
-    const config: TaskConfig = {
-      type: WENDY_TASK_TYPE,
-      args: ["run", "--detach", product.name],
-      cwd: folderContext.swift.folder,
-    };
-
     const task = new vscode.Task(
       config,
       vscode.TaskScope.Workspace,
-      `Run ${product.name}`,
+      `Run ${name}`,
       "wendy",
       new vscode.CustomExecution(
         async (
@@ -125,7 +126,7 @@ export class WendyTaskProvider implements vscode.TaskProvider {
           }
 
           const runtime = vscode.workspace.getConfiguration("wendyos").get<string>("runtime");
-          if(runtime) {
+          if (runtime) {
             args.push("--runtime", runtime);
           }
 
@@ -137,8 +138,34 @@ export class WendyTaskProvider implements vscode.TaskProvider {
       )
     );
 
-    task.group = vscode.TaskGroup.Build;
     return [task];
+  }
+
+  createPythonRunTask(folderContext: WendyFolderContext): vscode.Task[] {
+    const config: TaskConfig = {
+      type: WENDY_TASK_TYPE,
+      args: ["run", "--detach"],
+      cwd: folderContext.folder,
+    };
+
+    return this.createRunTasks(config, "Python App");
+  }
+
+  createSwiftRunTasks(
+    product: Swift.Product,
+    folderContext: WendyFolderContext
+  ): vscode.Task[] {
+    if (!folderContext.swift) {
+      return [];
+    }
+
+    const config: TaskConfig = {
+      type: WENDY_TASK_TYPE,
+      args: ["run", "--detach", product.name],
+      cwd: folderContext.swift.folder,
+    };
+
+    return this.createRunTasks(config, product.name);
   }
 
   async resolveTask(
@@ -190,9 +217,10 @@ export class WendyTaskProvider implements vscode.TaskProvider {
    */
   public static register(
     context: WendyWorkspaceContext,
-    deviceManager?: DeviceManager
+    deviceManager?: DeviceManager,
+    _options?: { hasPythonExtension: boolean }
   ): vscode.Disposable {
-    const provider = new WendyTaskProvider(context, deviceManager);
+    const provider = new WendyTaskProvider(context, deviceManager, _options);
     return vscode.tasks.registerTaskProvider(WENDY_TASK_TYPE, provider);
   }
 }

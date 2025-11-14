@@ -25,11 +25,11 @@ export function getErrorDescription(error: unknown): string {
 
 export class ExecFileError extends Error {
   constructor(
-      public readonly causedBy: Error,
-      public readonly stdout: string,
-      public readonly stderr: string
+    public readonly causedBy: Error,
+    public readonly stdout: string,
+    public readonly stderr: string
   ) {
-      super(causedBy.message);
+    super(causedBy.message);
   }
 }
 
@@ -48,17 +48,17 @@ export async function execFile(
   options: cp.ExecFileOptions = {}
 ): Promise<{ stdout: string; stderr: string }> {
   options = {
-      ...options,
-      maxBuffer: options.maxBuffer ?? 1024 * 1024 * 64, // 64MB
+    ...options,
+    maxBuffer: options.maxBuffer ?? 1024 * 1024 * 64, // 64MB
   };
   return new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
-      cp.execFile(executable, args, options, (error, stdout, stderr) => {
-          if (error) {
-              reject(new ExecFileError(error, stdout, stderr));
-          } else {
-              resolve({ stdout, stderr });
-          }
-      });
+    cp.execFile(executable, args, options, (error, stdout, stderr) => {
+      if (error) {
+        reject(new ExecFileError(error, stdout.toString(), stderr.toString()));
+      } else {
+        resolve({ stdout: stdout.toString(), stderr: stderr.toString() });
+      }
+    });
   });
 }
 
@@ -75,15 +75,15 @@ export function expandFilePathTilde(
 ): string {
   // Guard no expanding on windows
   if (platform === "win32") {
-      return filepath;
+    return filepath;
   }
   // Guard tilde is present
   if (filepath[0] !== "~") {
-      return filepath;
+    return filepath;
   }
   // Guard we know home directory
   if (!directory) {
-      return filepath;
+    return filepath;
   }
   return path.join(directory, filepath.slice(1));
 }
