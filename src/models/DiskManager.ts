@@ -16,7 +16,7 @@ export class DiskManager {
       return [];
     }
 
-    // Execute the wendy imager list command
+    // Execute the wendy os list-drives command
     const output = await new Promise<string>((resolve, reject) => {
       exec(`${cli.path} os list-drives --json --all`, (error, stdout) => {
         if (error) {
@@ -25,7 +25,7 @@ export class DiskManager {
         resolve(stdout);
       });
     });
-    
+
     // Parse the JSON output
     return JSON.parse(output);
   }

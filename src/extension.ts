@@ -603,7 +603,7 @@ export async function activate(
               canPickMany: false
             }
           );
-            
+
           if (!selectedImage) {
             return;
           }
@@ -677,6 +677,14 @@ export async function activate(
       })
     );
 
+    const pythonExtension = vscode.extensions.getExtension("ms-python.debugpy");
+    if (pythonExtension) {
+      outputChannel.appendLine(`Python extension version: ${pythonExtension.packageJSON.version}`);
+      await pythonExtension.activate();
+    } else {
+      outputChannel.appendLine("Python extension not found");
+    }
+
     const swiftExtension = vscode.extensions.getExtension<SwiftExtensionApi>(
       "swiftlang.swift-vscode"
     );
@@ -704,17 +712,23 @@ export async function activate(
           // Check if this is an Wendy project
           const isWendyProject = await WendyProjectDetector.isWendyProject(folder.folder.fsPath);
           if (isWendyProject) {
-            // Check if there are already Wendy configurations for this folder
-            const wsLaunchSection = vscode.workspace.getConfiguration("launch", folder.folder);
-            const configurations = wsLaunchSection.get<any[]>("configurations") || [];
-            const hasWendyConfigurations = configurations.some(
-              config => config.type === WENDY_LAUNCH_CONFIG_TYPE
-            );
-            
-            if (!hasWendyConfigurations) {
-              await makeDebugConfigurations(folder);
-              await wendyWorkspaceContext.promptRefreshDebugConfigurations();
-              outputChannel.appendLine(`Added Wendy debug configurations to new folder ${folder.folder.fsPath}`);
+            // Find the corresponding WendyFolderContext
+            for (const wendyFolder of wendyWorkspaceContext.folders) {
+              if (wendyFolder.swift === folder) {
+                // Check if there are already Wendy configurations for this folder
+                const wsLaunchSection = vscode.workspace.getConfiguration("launch", folder.folder);
+                const configurations = wsLaunchSection.get<any[]>("configurations") || [];
+                const hasWendyConfigurations = configurations.some(
+                  config => config.type === WENDY_LAUNCH_CONFIG_TYPE
+                );
+
+                if (!hasWendyConfigurations) {
+                  await makeDebugConfigurations(wendyFolder);
+                  await wendyWorkspaceContext.promptRefreshDebugConfigurations();
+                  outputChannel.appendLine(`Added Wendy debug configurations to new folder ${folder.folder.fsPath}`);
+                }
+                break;
+              }
             }
           }
         }
@@ -767,7 +781,9 @@ export async function activate(
 
     // Register the task provider
     context.subscriptions.push(
-      WendyTaskProvider.register(wendyWorkspaceContext, deviceManager)
+      WendyTaskProvider.register(wendyWorkspaceContext, deviceManager, {
+        hasPythonExtension: !!pythonExtension
+      })
     );
 
     // Register the debug configuration providers
@@ -823,4 +839,4 @@ export async function activate(
 }
 
 // This method is called when your extension is deactivated
-export function deactivate() {}
+export function deactivate() { }

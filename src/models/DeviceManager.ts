@@ -78,7 +78,7 @@ export class DeviceManager {
   >();
   readonly onCurrentDeviceChanged = this._onCurrentDeviceChanged.event;
 
-  constructor() {}
+  constructor() { }
 
   /**
    * Get all configured devices
@@ -97,13 +97,13 @@ export class DeviceManager {
       undefined,
       "Custom"
     ));
-    
+
     try {
       const cli = await WendyCLI.create();
       if (!cli) {
         return manuallyAddedDevices;
       }
-  
+
       // Execute the wendy discover command with a single --json output flag
       const output = await new Promise<string>((resolve, reject) => {
         exec(`${cli.path} discover --json`, (error, stdout) => {
@@ -113,7 +113,7 @@ export class DeviceManager {
           resolve(stdout);
         });
       });
-      
+
       // Parse the JSON output
       const deviceList: DeviceList = JSON.parse(output);
       const nextLanDeviceDetails = new Map<string, LANDevice>();
@@ -137,7 +137,7 @@ export class DeviceManager {
       this.lanDeviceDetails = nextLanDeviceDetails;
       this.devices = devices;
       const currentDevice = this.getCurrentDevice();
-      if(currentDevice) {
+      if (currentDevice) {
         this.checkForUpdates(currentDevice);
       }
       return devices;
@@ -145,7 +145,7 @@ export class DeviceManager {
       console.error(error);
       this.devices = manuallyAddedDevices;
       const currentDevice = this.getCurrentDevice();
-      if(currentDevice) {
+      if (currentDevice) {
         this.checkForUpdates(currentDevice);
       }
       return manuallyAddedDevices;
@@ -179,7 +179,7 @@ export class DeviceManager {
   }
 
   async checkForUpdates(device: Device): Promise<void> {
-    if(this.deviceIdsCheckedForUpdates.has(device.id)) {
+    if (this.deviceIdsCheckedForUpdates.has(device.id)) {
       return;
     }
     this.deviceIdsCheckedForUpdates.add(device.id);
@@ -190,7 +190,7 @@ export class DeviceManager {
     }
 
     const output = await new Promise<string>((resolve, reject) => {
-      exec(`${cli.path} agent version --agent ${device.address} --json --check-updates --prerelease`, (error, stdout) => {
+      exec(`${cli.path} device version --agent ${device.address} --json --check-updates --prerelease`, (error, stdout) => {
         if (error) {
           reject(error);
         }
@@ -199,13 +199,13 @@ export class DeviceManager {
     });
 
     const updates: AgentUpdateAvailable = JSON.parse(output);
-    if(updates.latestVersion) {
+    if (updates.latestVersion) {
       const confirmed = await vscode.window.showInformationMessage(
         `Update available for ${device.name}: ${updates.latestVersion}`,
         "Update"
       );
 
-      if(confirmed === "Update") {
+      if (confirmed === "Update") {
         await this.updateAgent(device.id);
       }
     }
@@ -220,7 +220,7 @@ export class DeviceManager {
     // If trying to set a device, make sure it exists
     if (deviceId) {
       const device = this.devices.find((d) => d.id === deviceId);
-      if(!device) {
+      if (!device) {
         throw new Error(`Device with ID ${deviceId} not found`);
       }
       this.currentDevice = device;
@@ -348,7 +348,7 @@ export class DeviceManager {
     if (!network) {
       return;
     }
-    
+
     const password = await vscode.window.showInputBox({
       prompt: "Enter the password for the WiFi network",
       password: true,
@@ -366,7 +366,7 @@ export class DeviceManager {
         resolve(stdout);
       });
     });
-    
+
     const status: WifiConnectionResult = JSON.parse(output);
 
     if (!status.success) {

@@ -6,25 +6,81 @@ import { DeviceManager } from "../models/DeviceManager";
 import { getErrorDescription } from "../utilities/utilities";
 import { realpath } from "fs/promises";
 import * as os from "os";
+import { debug } from "console";
 
 export const WENDY_LAUNCH_CONFIG_TYPE = "wendy";
 // Default debug port used by Wendy agent
 export const DEFAULT_DEBUG_PORT = 4242;
+// Default debugpy port
+export const DEFAULT_DEBUGPY_PORT = 5678;
 // Debugger type to use - can be "lldb-dap" or "codelldb"
 export type DebuggerType = "lldb-dap" | "codelldb";
 export const DEBUGGER_TYPE: DebuggerType = "lldb-dap";
 
 export class WendyDebugConfigurationProvider
-  implements vscode.DebugConfigurationProvider
-{
+  implements vscode.DebugConfigurationProvider {
   constructor(
     private readonly outputChannel: vscode.OutputChannel,
     private readonly cli: WendyCLI,
     private readonly workspaceContext: WendyWorkspaceContext,
     private readonly deviceManager: DeviceManager
-  ) {}
+  ) { }
 
   async provideDebugConfigurations(
+    folder: vscode.WorkspaceFolder | undefined,
+    token?: vscode.CancellationToken
+  ): Promise<vscode.DebugConfiguration[]> {
+    this.outputChannel.appendLine("Providing Wendy debug configurations...");
+    if (!folder) {
+      this.outputChannel.appendLine("No workspace folder found.");
+      return [];
+    }
+
+    const edgeJson = path.join(folder.uri.fsPath, 'wendy.json');
+    let edgeConfig: any = undefined;
+    try {
+      // Read wendy.json from the workspace folder and parse it as JSON
+      const fileData = await vscode.workspace.fs.readFile(
+        vscode.Uri.file(edgeJson)
+      );
+      const fileText = Buffer.from(fileData).toString("utf8");
+      edgeConfig = JSON.parse(fileText);
+    } catch (err) {
+      // If the file doesn't exist or is invalid JSON, log and continue without it
+      this.outputChannel.appendLine(
+        `Could not read or parse wendy.json at ${edgeJson}: ${getErrorDescription(
+          err
+        )}`
+      );
+      edgeConfig = undefined;
+    }
+
+    // Route to language-specific providers when appropriate
+    if (edgeConfig.language === "python") {
+      return this.provideDebugConfigurationsPython(folder, token);
+    }
+
+    // Default to Swift provider
+    return this.provideDebugConfigurationsSwift(folder, token);
+  }
+
+  async provideDebugConfigurationsPython(
+    folder: vscode.WorkspaceFolder | undefined,
+    token?: vscode.CancellationToken
+  ): Promise<vscode.DebugConfiguration[]> {
+    return [
+      {
+        type: WENDY_LAUNCH_CONFIG_TYPE,
+        name: "Debug Python App on WendyOS",
+        request: "attach",
+        target: "Python App",
+        cwd: folder?.uri.path,
+        preLaunchTask: "wendy: Run Python App",
+      }
+    ];
+  }
+
+  async provideDebugConfigurationsSwift(
     folder: vscode.WorkspaceFolder | undefined,
     token?: vscode.CancellationToken
   ): Promise<vscode.DebugConfiguration[]> {
@@ -32,6 +88,10 @@ export class WendyDebugConfigurationProvider
 
     // Generate a debug configuration for each Swift executable target
     for (const folderContext of this.workspaceContext.folders) {
+      if (!folderContext.swift) {
+        continue;
+      }
+
       const executableProducts = await folderContext.swift.swiftPackage
         .executableProducts;
 
@@ -53,25 +113,137 @@ export class WendyDebugConfigurationProvider
   /**
    * Ensure the address includes port 4242 for debugging
    */
-  private ensureDebugPort(address: string): string {
+  private ensureDebugPort(address: string, port: number): string {
     // Check if address already includes a port
     if (address.includes(":")) {
       // Extract host and port
       const [host, port] = address.split(":");
 
       // If port is already 4242, return as is
-      if (port === DEFAULT_DEBUG_PORT.toString()) {
+      if (port === port.toString()) {
         return address;
       }
 
-      return `${host}:${DEFAULT_DEBUG_PORT}`;
+      return `${host}:${port}`;
     }
 
     // No port specified, append the default debug port
-    return `${address}:${DEFAULT_DEBUG_PORT}`;
+    return `${address}:${port}`;
+  }
+
+  async selectCurrentDevice(
+    folder: vscode.WorkspaceFolder | undefined,
+    port: number
+  ): Promise<null | string> {
+    // Check if a device is selected
+    const currentDevice = this.deviceManager.getCurrentDevice();
+    if (!currentDevice) {
+      const actions = ["Add Device", "Select Device", "Cancel"];
+      const selection = await vscode.window.showErrorMessage(
+        "No WendyOS device is selected. You must select a device before debugging.",
+        ...actions
+      );
+
+      if (selection === "Add Device") {
+        await vscode.commands.executeCommand("wendyDevices.addDevice");
+      } else if (selection === "Select Device") {
+        // Open the devices view to allow selection
+        await vscode.commands.executeCommand(
+          "workbench.view.extension.wendy-explorer"
+        );
+      }
+
+      return null; // Cancel debugging
+    }
+
+    // Get the device address and ensure it has the correct debug port
+    return this.ensureDebugPort(currentDevice.address, port);
   }
 
   async resolveDebugConfigurationWithSubstitutedVariables(
+    folder: vscode.WorkspaceFolder | undefined,
+    debugConfiguration: vscode.DebugConfiguration,
+    token?: vscode.CancellationToken
+  ): Promise<vscode.DebugConfiguration | undefined | null> {
+    if (!folder) {
+      return null;
+    }
+
+    const edgeConfigPath = path.join(folder.uri.fsPath, 'wendy.json');
+    let edgeConfig: any = undefined;
+    try {
+      // Read wendy.json from the workspace folder and parse it as JSON
+      const fileData = await vscode.workspace.fs.readFile(
+        vscode.Uri.file(edgeConfigPath)
+      );
+      const fileText = Buffer.from(fileData).toString("utf8");
+      edgeConfig = JSON.parse(fileText);
+    } catch (err) {
+      // If the file doesn't exist or is invalid JSON, log and continue without it
+      this.outputChannel.appendLine(
+        `Could not read or parse wendy.json at ${edgeConfigPath}: ${getErrorDescription(
+          err
+        )}`
+      );
+      edgeConfig = undefined;
+    }
+
+    // Route to language-specific resolvers when appropriate
+    if (edgeConfig.language === "python") {
+      return this.resolveDebugConfigurationWithSubstitutedVariablesPython(
+        folder,
+        debugConfiguration,
+        token
+      );
+    }
+
+    // Default to Swift resolver
+    return this.resolveDebugConfigurationWithSubstitutedVariablesSwift(
+      folder,
+      debugConfiguration,
+      token
+    );
+  }
+
+  async resolveDebugConfigurationWithSubstitutedVariablesPython(
+    folder: vscode.WorkspaceFolder | undefined,
+    debugConfiguration: vscode.DebugConfiguration,
+    token?: vscode.CancellationToken
+  ): Promise<vscode.DebugConfiguration | undefined | null> {
+    // Wait for launch to be ready
+    // Try to discover a TCP connection on port 5678
+    this.outputChannel.appendLine("Waiting for Python debug server to be ready...");
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+
+    this.outputChannel.appendLine("Resolving Python debug configuration...");
+    const remoteAddress = await this.selectCurrentDevice(folder, DEFAULT_DEBUGPY_PORT);
+    if (!remoteAddress) {
+      this.outputChannel.appendLine("No remote address found.");
+      return null; // Cancel debugging
+    }
+
+    debugConfiguration.type = "debugpy";
+    debugConfiguration.request = "attach";
+    debugConfiguration.connect = {
+      host: remoteAddress,
+      port: DEFAULT_DEBUGPY_PORT,
+    };
+    debugConfiguration.pathMappings = [
+      {
+        localRoot: folder?.uri.fsPath,
+        remoteRoot: "/app",
+      },
+    ];
+
+    // Ensure we have a preLaunchTask to build the target if not specified
+    if (!debugConfiguration.preLaunchTask && debugConfiguration.target) {
+      debugConfiguration.preLaunchTask = `wendy: Run Python App`;
+    }
+
+    return debugConfiguration;
+  }
+
+  async resolveDebugConfigurationWithSubstitutedVariablesSwift(
     folder: vscode.WorkspaceFolder | undefined,
     debugConfiguration: vscode.DebugConfiguration,
     token?: vscode.CancellationToken
@@ -120,24 +292,8 @@ export class WendyDebugConfigurationProvider
       return null; // Cancel debugging
     }
 
-    // Check if a device is selected
-    const currentDevice = await this.deviceManager.getCurrentDevice();
-    if (!currentDevice) {
-      const actions = ["Add Device", "Select Device", "Cancel"];
-      const selection = await vscode.window.showErrorMessage(
-        "No WendyOS device is selected. You must select a device before debugging.",
-        ...actions
-      );
-
-      if (selection === "Add Device") {
-        await vscode.commands.executeCommand("wendyDevices.addDevice");
-      } else if (selection === "Select Device") {
-        // Open the devices view to allow selection
-        await vscode.commands.executeCommand(
-          "workbench.view.extension.wendy-explorer"
-        );
-      }
-
+    const remoteAddress = await this.selectCurrentDevice(folder, DEFAULT_DEBUG_PORT);
+    if (!remoteAddress) {
       return null; // Cancel debugging
     }
 
@@ -147,13 +303,11 @@ export class WendyDebugConfigurationProvider
       ".wendy-build/debug"
     );
 
-    // Get the device address and ensure it has the correct debug port
-    const remoteAddress = this.ensureDebugPort(currentDevice.address);
-
     // Check the format of the SDK bundle to ensure we're using the right paths
     const sdkSubPath = "";
+    // TODO: Detect SDK structure dynamically, instead of assuming Swift 6.2.1 layout
     const moduleSubPath =
-      "6.1-RELEASE_wendyos_aarch64/aarch64-unknown-linux-gnu/debian-bookworm.sdk/usr/lib/swift_static/linux";
+      "6.2.1-RELEASE_wendyos_aarch64/aarch64-unknown-linux-gnu/debian-bookworm.sdk/usr/lib/swift_static/linux";
 
     // Create shared SDK path commands for both debugger types
     const sdkPathCommands = [
@@ -187,7 +341,7 @@ export class WendyDebugConfigurationProvider
       debugConfiguration.request = "launch";
 
       // Add the current device address to the debug configuration
-      debugConfiguration.agent = currentDevice.address;
+      debugConfiguration.agent = remoteAddress;
 
       // Configure commands for CodeLLDB
       debugConfiguration.targetCreateCommands = [
@@ -232,7 +386,6 @@ export class WendyDebugConfigurationProvider
       provider
     );
 
-    // Also register as a dynamic provider (for showing configurations in the UI)
     const dynamicProvider = vscode.debug.registerDebugConfigurationProvider(
       WENDY_LAUNCH_CONFIG_TYPE,
       provider,
