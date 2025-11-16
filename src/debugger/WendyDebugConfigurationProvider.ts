@@ -133,7 +133,7 @@ export class WendyDebugConfigurationProvider
 
   async selectCurrentDevice(
     folder: vscode.WorkspaceFolder | undefined,
-    port: number
+    port: number | null
   ): Promise<null | string> {
     // Check if a device is selected
     const currentDevice = this.deviceManager.getCurrentDevice();
@@ -156,8 +156,12 @@ export class WendyDebugConfigurationProvider
       return null; // Cancel debugging
     }
 
-    // Get the device address and ensure it has the correct debug port
-    return this.ensureDebugPort(currentDevice.address, port);
+    if (port) {
+      // Get the device address and ensure it has the correct debug port
+      return this.ensureDebugPort(currentDevice.address, port);
+    } else {
+      return currentDevice.address;
+    }
   }
 
   async resolveDebugConfigurationWithSubstitutedVariables(
@@ -216,7 +220,7 @@ export class WendyDebugConfigurationProvider
     await new Promise((resolve) => setTimeout(resolve, 2000));
 
     this.outputChannel.appendLine("Resolving Python debug configuration...");
-    const remoteAddress = await this.selectCurrentDevice(folder, DEFAULT_DEBUGPY_PORT);
+    const remoteAddress = await this.selectCurrentDevice(folder, null);
     if (!remoteAddress) {
       this.outputChannel.appendLine("No remote address found.");
       return null; // Cancel debugging
@@ -231,7 +235,7 @@ export class WendyDebugConfigurationProvider
     debugConfiguration.pathMappings = [
       {
         localRoot: folder?.uri.fsPath,
-        remoteRoot: "/app",
+        remoteRoot: "/app", // TODO: Workdir of app. How to determine?
       },
     ];
 
