@@ -58,6 +58,10 @@
           "name": "Disks"
         },
         {
+          "id": "wendyOperatingSystemCache",
+          "name": "Operating System Cache"
+        },
+        {
           "id": "wendyDocumentation",
           "name": "Documentation"
         }
@@ -90,6 +94,21 @@
         "icon": "$(sync)"
       },
       {
+        "command": "wendyDevices.showInfo",
+        "title": "More Info",
+        "category": "Wendy"
+      },
+      {
+        "command": "wendyDevices.copyHostname",
+        "title": "Copy Hostname",
+        "category": "Wendy"
+      },
+      {
+        "command": "wendyDevices.copyAgentVersion",
+        "title": "Copy Wendy Agent Version",
+        "category": "Wendy"
+      },
+      {
         "command": "wendyDevices.selectDevice",
         "title": "Set as Current Device",
         "icon": "$(check)"
@@ -103,6 +122,37 @@
         "command": "wendyDisks.refreshDisks",
         "title": "Refresh Disks",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "wendyOperatingSystemCache.openRootFinder",
+        "title": "Reveal in Finder",
+        "icon": "$(folder-opened)"
+      },
+      {
+        "command": "wendyOperatingSystemCache.openRootExplorer",
+        "title": "Reveal in Explorer",
+        "icon": "$(folder-opened)"
+      },
+      {
+        "command": "wendyOperatingSystemCache.openRootFileManager",
+        "title": "Reveal Cache Folder",
+        "icon": "$(folder-opened)"
+      },
+      {
+        "command": "wendyOperatingSystemCache.revealFinder",
+        "title": "Reveal in Finder"
+      },
+      {
+        "command": "wendyOperatingSystemCache.revealExplorer",
+        "title": "Reveal in Explorer"
+      },
+      {
+        "command": "wendyOperatingSystemCache.revealFileManager",
+        "title": "Reveal in File Manager"
+      },
+      {
+        "command": "wendyOperatingSystemCache.deleteEntry",
+        "title": "Delete"
       },
       {
         "command": "wendy.refreshDebugConfigurations",
@@ -131,6 +181,21 @@
           "command": "wendyDisks.refreshDisks",
           "when": "view == wendyDisks",
           "group": "navigation"
+        },
+        {
+          "command": "wendyOperatingSystemCache.openRootFinder",
+          "when": "view == wendyOperatingSystemCache && isMac",
+          "group": "navigation"
+        },
+        {
+          "command": "wendyOperatingSystemCache.openRootExplorer",
+          "when": "view == wendyOperatingSystemCache && isWindows",
+          "group": "navigation"
+        },
+        {
+          "command": "wendyOperatingSystemCache.openRootFileManager",
+          "when": "view == wendyOperatingSystemCache && !isMac && !isWindows",
+          "group": "navigation"
         }
       ],
       "view/item/context": [
@@ -141,7 +206,23 @@
         },
         {
           "command": "wendyDevices.updateAgent",
-          "when": "view == wendyDevices && viewItem =~ /device/"
+          "when": "view == wendyDevices && viewItem =~ /device/",
+          "group": "navigation@0"
+        },
+        {
+          "command": "wendyDevices.showInfo",
+          "when": "view == wendyDevices && viewItem =~ /device/ && viewItem =~ /LAN/",
+          "group": "navigation@1"
+        },
+        {
+          "command": "wendyDevices.copyHostname",
+          "when": "view == wendyDevices && viewItem =~ /device/ && viewItem =~ /LAN/",
+          "group": "navigation@2"
+        },
+        {
+          "command": "wendyDevices.copyAgentVersion",
+          "when": "view == wendyDevices && viewItem =~ /device/ && viewItem =~ /LAN/",
+          "group": "navigation@3"
         },
         {
           "command": "wendyDevices.selectDevice",
@@ -152,9 +233,37 @@
           "command": "wendyDisks.flashDisk",
           "when": "view == wendyDisks && viewItem == disk",
           "group": "inline"
+        },
+        {
+          "command": "wendyOperatingSystemCache.revealFinder",
+          "when": "view == wendyOperatingSystemCache && viewItem =~ /operatingSystemCache/ && isMac",
+          "group": "navigation"
+        },
+        {
+          "command": "wendyOperatingSystemCache.revealExplorer",
+          "when": "view == wendyOperatingSystemCache && viewItem =~ /operatingSystemCache/ && isWindows",
+          "group": "navigation"
+        },
+        {
+          "command": "wendyOperatingSystemCache.revealFileManager",
+          "when": "view == wendyOperatingSystemCache && viewItem =~ /operatingSystemCache/ && !isMac && !isWindows",
+          "group": "navigation"
+        },
+        {
+          "command": "wendyOperatingSystemCache.deleteEntry",
+          "when": "view == wendyOperatingSystemCache && viewItem =~ /operatingSystemCache/",
+          "group": "navigation@2"
         }
       ]
     },
+    "keybindings": [
+      {
+        "command": "wendyOperatingSystemCache.deleteEntry",
+        "key": "delete",
+        "mac": "backspace",
+        "when": "view == wendyOperatingSystemCache && viewItem =~ /operatingSystemCache/"
+      }
+    ],
     "configuration": {
       "title": "WendyOS",
       "properties": {
@@ -199,6 +308,11 @@
           "type": "string",
           "default": null,
           "description": "ID of the currently selected Wendy device"
+        },
+        "wendy.cache.root": {
+          "type": "string",
+          "default": "",
+          "description": "Root directory that the Operating System Cache view displays. Leave empty to use the default cache path for your OS (`~/.wendy/cache` on macOS/Linux, `%LOCALAPPDATA%\\Wendy\\cache` on Windows). Supports `~` expansion."
         }
       }
     },

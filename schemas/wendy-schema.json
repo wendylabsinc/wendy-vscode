@@ -8,6 +8,27 @@
         "version": {
             "type": "string"
         },
+        "language": {
+            "type": "string",
+            "enum": [
+                "python",
+                "swift"
+            ]
+        },
+        "python": {
+            "type": "object",
+            "properties": {
+                "container": {
+                    "type": "object",
+                    "properties": {
+                        "sourceRoot": {
+                            "type": "string",
+                            "description": "The directory in the container where the Python source code is located."
+                        }
+                    }
+                }
+            }
+        },
         "entitlements": {
             "type": "array",
             "items": {
@@ -15,37 +36,54 @@
                 "properties": {
                     "type": {
                         "type": "string",
-                        "enum": ["network", "video"],
+                        "enum": [
+                            "network",
+                            "video"
+                        ],
                         "description": "The type of entitlement.",
                         "$comment": "The `type` property is always required. It's added explicitly another time to help with autocompletion."
                     }
                 },
-                "required": ["type"],
+                "required": [
+                    "type"
+                ],
                 "oneOf": [
                     {
                         "type": "object",
-                        "required": ["type", "mode"],
+                        "required": [
+                            "type",
+                            "mode"
+                        ],
                         "description": "Define access to the network.",
                         "properties": {
                             "type": {
                                 "type": "string",
-                                "enum": ["network"]
+                                "enum": [
+                                    "network"
+                                ]
                             },
                             "mode": {
                                 "type": "string",
-                                "enum": ["host", "none"],
+                                "enum": [
+                                    "host",
+                                    "none"
+                                ],
                                 "description": "Network mode - 'host' allows network access, 'none' disables all network access"
                             }
                         }
                     },
                     {
                         "type": "object",
-                        "required": ["type"],
+                        "required": [
+                            "type"
+                        ],
                         "description": "Define access to camera devices.",
                         "properties": {
                             "type": {
                                 "type": "string",
-                                "enum": ["video"]
+                                "enum": [
+                                    "video"
+                                ]
                             }
                         }
                     }
@@ -53,5 +91,9 @@
             }
         }
     },
-    "required": ["appId", "version", "entitlements"],
+    "required": [
+        "appId",
+        "version",
+        "entitlements"
+    ],
 }
