@@ -24,7 +24,6 @@
   ],
   "main": "./dist/extension.js",
   "extensionDependencies": [
-    "swiftlang.swift-vscode",
     "ms-python.debugpy"
   ],
   "contributes": {
