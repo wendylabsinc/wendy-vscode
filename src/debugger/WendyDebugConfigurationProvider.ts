@@ -8,6 +8,7 @@ import { realpath } from "fs/promises";
 import * as os from "os";
 import { debug } from "console";
 import { warnMissingSwiftExtension } from "../utilities/SwiftExtensionNotifications";
+import { warnMissingPythonExtension } from "../utilities/PythonExtensionNotifications";
 
 export const WENDY_LAUNCH_CONFIG_TYPE = "wendy";
 // Default debug port used by Wendy agent
@@ -83,6 +84,10 @@ export class WendyDebugConfigurationProvider
     folder: vscode.WorkspaceFolder | undefined,
     token?: vscode.CancellationToken
   ): Promise<vscode.DebugConfiguration[]> {
+    if (!this.workspaceContext.hasPythonExtension) {
+      return [];
+    }
+
     return [
       {
         type: WENDY_LAUNCH_CONFIG_TYPE,
@@ -236,6 +241,11 @@ export class WendyDebugConfigurationProvider
     token?: vscode.CancellationToken,
     wendyConfig?: WendyConfig
   ): Promise<vscode.DebugConfiguration | undefined | null> {
+    if (!this.workspaceContext.hasPythonExtension) {
+      warnMissingPythonExtension();
+      return null;
+    }
+
     // Wait for launch to be ready
     // Try to discover a TCP connection on port 5678
     this.outputChannel.appendLine("Waiting for Python debug server to be ready...");

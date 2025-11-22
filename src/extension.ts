@@ -743,7 +743,8 @@ export async function activate(
       context,
       outputChannel,
       wendyCLI,
-      swiftWorkspaceContext
+      swiftWorkspaceContext,
+      !!pythonExtension
     );
 
     // Store the WendyWorkspaceContext in the extension context for later use

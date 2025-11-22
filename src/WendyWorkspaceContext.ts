@@ -30,6 +30,7 @@ const _typeCheck: VerifyFolderOperation = FolderOperation;
 export class WendyWorkspaceContext implements vscode.Disposable {
   public folders: WendyFolderContext[] = [];
   public readonly hasSwiftExtension: boolean;
+  public readonly hasPythonExtension: boolean;
   private _onDidChangePackage = new vscode.EventEmitter<WendyFolderContext>();
   private hasWendyFolder = false;
   public readonly onDidChangePackage = this._onDidChangePackage.event;
@@ -53,9 +54,11 @@ export class WendyWorkspaceContext implements vscode.Disposable {
     public readonly context: vscode.ExtensionContext,
     public readonly output: vscode.OutputChannel,
     public readonly cli: WendyCLI,
-    public readonly swift: Swift.WorkspaceContext | undefined
+    public readonly swift: Swift.WorkspaceContext | undefined,
+    hasPythonExtension = false
   ) {
     this.hasSwiftExtension = Boolean(swift);
+    this.hasPythonExtension = hasPythonExtension;
 
     // Store initial workspace folders to track processing
     if (vscode.workspace.workspaceFolders) {
