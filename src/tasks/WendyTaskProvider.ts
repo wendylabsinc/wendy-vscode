@@ -82,7 +82,8 @@ export class WendyTaskProvider implements vscode.TaskProvider {
     // The device manager can be injected for testing, or we'll create one
     this.deviceManager = deviceManager || new DeviceManager();
     this.wendyCLI = workspaceContext.cli;
-    this.hasPythonExtension = _options?.hasPythonExtension || false;
+    this.hasPythonExtension =
+      _options?.hasPythonExtension ?? workspaceContext.hasPythonExtension;
   }
 
   async provideTasks(token: vscode.CancellationToken): Promise<vscode.Task[]> {
