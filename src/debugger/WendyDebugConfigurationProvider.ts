@@ -7,6 +7,7 @@ import { getErrorDescription } from "../utilities/utilities";
 import { realpath } from "fs/promises";
 import * as os from "os";
 import { debug } from "console";
+import { warnMissingSwiftExtension } from "../utilities/SwiftExtensionNotifications";
 
 export const WENDY_LAUNCH_CONFIG_TYPE = "wendy";
 // Default debug port used by Wendy agent
@@ -98,6 +99,10 @@ export class WendyDebugConfigurationProvider
     folder: vscode.WorkspaceFolder | undefined,
     token?: vscode.CancellationToken
   ): Promise<vscode.DebugConfiguration[]> {
+    if (!this.workspaceContext.hasSwiftExtension) {
+      return [];
+    }
+
     const configs: vscode.DebugConfiguration[] = [];
 
     // Generate a debug configuration for each Swift executable target
@@ -280,6 +285,11 @@ export class WendyDebugConfigurationProvider
     token?: vscode.CancellationToken,
     wendyConfig?: WendyConfig
   ): Promise<vscode.DebugConfiguration | undefined | null> {
+    if (!this.workspaceContext.hasSwiftExtension) {
+      warnMissingSwiftExtension();
+      return null;
+    }
+
     // Check if Swift SDK path is set
     const config = vscode.workspace.getConfiguration("wendyos");
     let sdkPath = config.get<string>("swiftSdkPath");

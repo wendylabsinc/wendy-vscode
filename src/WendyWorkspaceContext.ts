@@ -29,6 +29,7 @@ const _typeCheck: VerifyFolderOperation = FolderOperation;
 
 export class WendyWorkspaceContext implements vscode.Disposable {
   public folders: WendyFolderContext[] = [];
+  public readonly hasSwiftExtension: boolean;
   private _onDidChangePackage = new vscode.EventEmitter<WendyFolderContext>();
   private hasWendyFolder = false;
   public readonly onDidChangePackage = this._onDidChangePackage.event;
@@ -52,8 +53,10 @@ export class WendyWorkspaceContext implements vscode.Disposable {
     public readonly context: vscode.ExtensionContext,
     public readonly output: vscode.OutputChannel,
     public readonly cli: WendyCLI,
-    public readonly swift: Swift.WorkspaceContext
+    public readonly swift: Swift.WorkspaceContext | undefined
   ) {
+    this.hasSwiftExtension = Boolean(swift);
+
     // Store initial workspace folders to track processing
     if (vscode.workspace.workspaceFolders) {
       console.log(`[Wendy] Initial workspace has ${vscode.workspace.workspaceFolders.length} folders`);
@@ -64,10 +67,15 @@ export class WendyWorkspaceContext implements vscode.Disposable {
       console.log(`[Wendy] No initial workspace folders`);
     }
 
-    // Subscribe to Swift workspace events
-    context.subscriptions.push(
-      this.swift.onDidChangeFolders((event) => this.handleFolderEvent(event))
-    );
+    // Subscribe to Swift workspace events when available
+    if (this.swift) {
+      context.subscriptions.push(
+        this.swift.onDidChangeFolders((event) => this.handleFolderEvent(event))
+      );
+    } else {
+      // Without the Swift extension we won't receive folder events, so mark ready immediately
+      this.markFoldersReady();
+    }
 
     // Still set a timeout as a fallback, but extend it since we'll likely
     // finish processing folders before this timeout
