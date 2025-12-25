@@ -107,6 +107,33 @@ For detailed Python debugging setup instructions, see [Python Debugging Guide](d
 
 ## Development
 
+### Local Testing
+
+You can test the extension in both VS Code (Marketplace) and Cursor (Open VSX) using the extension development host:
+
+```bash
+code --extensionDevelopmentPath=/Users/maximilianalexander/wendylabsinc/wendy-vscode
+```
+
+```bash
+cursor --extensionDevelopmentPath=/Users/maximilianalexander/wendylabsinc/wendy-vscode
+```
+
+If you want to test a packaged VSIX instead:
+
+```bash
+npm run package
+npx vsce package --out release/wendy-vscode.vsix
+```
+
+```bash
+code --install-extension release/wendy-vscode.vsix
+```
+
+```bash
+cursor --install-extension release/wendy-vscode.vsix
+```
+
 ### Release Process
 
 This extension uses an automated release process via GitHub Actions. For details on how to release new versions, see [Release Process Documentation](docs/release-process.md).

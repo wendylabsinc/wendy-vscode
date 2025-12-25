@@ -687,25 +687,19 @@ export async function activate(
 
     const swiftExtension = vscode.extensions.getExtension<SwiftExtensionApi>(
       "swiftlang.swift-vscode"
-    );
-    let swiftAPI: SwiftExtensionApi | undefined;
+    )!;
+    outputChannel.appendLine(`Swift extension version: ${swiftExtension.packageJSON.version}`);
+    let swiftAPI: SwiftExtensionApi;
 
-    if (!swiftExtension) {
-      outputChannel.appendLine("Swift extension not found; Swift-specific features will be disabled.");
-    } else {
-      outputChannel.appendLine(`Swift extension version: ${swiftExtension.packageJSON.version}`);
-      try {
-        swiftAPI = await swiftExtension.activate();
-        outputChannel.appendLine("Swift extension activated.");
-      } catch (error) {
-        outputChannel.appendLine(`Failed to activate Swift extension: ${getErrorDescription(error)}`);
-      }
+    try {
+      swiftAPI = await swiftExtension.activate();
+      outputChannel.appendLine("Swift extension activated.");
+    } catch (error) {
+      outputChannel.appendLine(`Failed to activate Swift extension: ${getErrorDescription(error)}`);
+      throw error;
     }
 
-    const swiftWorkspaceContext = swiftAPI?.workspaceContext;
-    if (swiftAPI && !swiftWorkspaceContext) {
-      outputChannel.appendLine("Swift API workspace context not found; Swift-specific features will be disabled.");
-    }
+    const swiftWorkspaceContext = swiftAPI.workspaceContext!;
 
     const wendyCLI = await WendyCLI.create();
     if (!wendyCLI) {
@@ -750,50 +744,48 @@ export async function activate(
     // Store the WendyWorkspaceContext in the extension context for later use
     context.subscriptions.push(wendyWorkspaceContext);
 
-    if (swiftWorkspaceContext) {
-      // Subscribe to folder changes in the Swift workspace context
-      const folderChangeDisposable = swiftWorkspaceContext.onDidChangeFolders(
-        async ({ folder, operation }) => {
-          outputChannel.appendLine(`Swift folder change detected: ${operation}`);
-          if (folder && operation === "add") {
-            outputChannel.appendLine(`Folder added: ${folder.folder.fsPath}`);
+    // Subscribe to folder changes in the Swift workspace context
+    const folderChangeDisposable = swiftWorkspaceContext.onDidChangeFolders(
+      async ({ folder, operation }) => {
+        outputChannel.appendLine(`Swift folder change detected: ${operation}`);
+        if (folder && operation === "add") {
+          outputChannel.appendLine(`Folder added: ${folder.folder.fsPath}`);
 
-            // Check if this is a Wendy project
-            const isWendyProject = await WendyProjectDetector.isWendyProject(
-              folder.folder.fsPath
-            );
-            if (isWendyProject) {
-              // Find the corresponding WendyFolderContext
-              for (const wendyFolder of wendyWorkspaceContext.folders) {
-                if (wendyFolder.swift === folder) {
-                  // Check if there are already Wendy configurations for this folder
-                  const wsLaunchSection = vscode.workspace.getConfiguration(
-                    "launch",
-                    folder.folder
-                  );
-                  const configurations =
-                    wsLaunchSection.get<any[]>("configurations") || [];
-                  const hasWendyConfigurations = configurations.some(
-                    (config) => config.type === WENDY_LAUNCH_CONFIG_TYPE
-                  );
+          // Check if this is a Wendy project
+          const isWendyProject = await WendyProjectDetector.isWendyProject(
+            folder.folder.fsPath
+          );
+          if (isWendyProject) {
+            // Find the corresponding WendyFolderContext
+            for (const wendyFolder of wendyWorkspaceContext.folders) {
+              if (wendyFolder.swift === folder) {
+                // Check if there are already Wendy configurations for this folder
+                const wsLaunchSection = vscode.workspace.getConfiguration(
+                  "launch",
+                  folder.folder
+                );
+                const configurations =
+                  wsLaunchSection.get<any[]>("configurations") || [];
+                const hasWendyConfigurations = configurations.some(
+                  (config) => config.type === WENDY_LAUNCH_CONFIG_TYPE
+                );
 
-                  if (!hasWendyConfigurations) {
-                    await makeDebugConfigurations(wendyFolder);
-                    await wendyWorkspaceContext.promptRefreshDebugConfigurations();
-                    outputChannel.appendLine(
-                      `Added Wendy debug configurations to new folder ${folder.folder.fsPath}`
-                    );
-                  }
-                  break;
+                if (!hasWendyConfigurations) {
+                  await makeDebugConfigurations(wendyFolder);
+                  await wendyWorkspaceContext.promptRefreshDebugConfigurations();
+                  outputChannel.appendLine(
+                    `Added Wendy debug configurations to new folder ${folder.folder.fsPath}`
+                  );
                 }
+                break;
               }
             }
           }
         }
-      );
-      context.subscriptions.push(folderChangeDisposable);
-      outputChannel.appendLine("Listening for Swift folder changes...");
-    }
+      }
+    );
+    context.subscriptions.push(folderChangeDisposable);
+    outputChannel.appendLine("Listening for Swift folder changes...");
 
     // Register the task provider
     context.subscriptions.push(
