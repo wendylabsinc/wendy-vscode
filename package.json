@@ -24,7 +24,8 @@
   ],
   "main": "./dist/extension.js",
   "extensionDependencies": [
-    "ms-python.debugpy"
+    "ms-python.debugpy",
+    "swiftlang.swift-vscode"
   ],
   "contributes": {
     "jsonValidation": [
