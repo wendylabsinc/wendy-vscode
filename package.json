@@ -39,10 +39,10 @@
         {
           "id": "wendy-explorer",
           "title": "Wendy",
-          "icon": "resources/activity_bar_icon_dark.png",
+          "icon": "resources/activity_bar_icon_dark.svg",
           "iconTheme": {
-            "light": "resources/activity_bar_icon_light.png",
-            "dark": "resources/activity_bar_icon_dark.png"
+            "light": "resources/activity_bar_icon_light.svg",
+            "dark": "resources/activity_bar_icon_dark.svg"
           }
         }
       ]
