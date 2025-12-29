@@ -2,7 +2,7 @@
   "name": "wendy-vscode",
   "displayName": "Wendy",
   "description": "Build and debug WendyOS applications with Visual Studio Code",
-  "version": "0.0.12",
+  "version": "0.0.13",
   "publisher": "wendylabsinc",
   "repository": {
     "type": "git",
@@ -427,10 +427,13 @@
     "check-types": "tsc --noEmit",
     "lint": "eslint src",
     "test": "vscode-test",
-    "publish:vscode": "bash ./scripts/publish.sh"
+    "publish:vscode": "bash ./scripts/publish.sh",
+    "publish:openvsx": "npx ovsx publish release/wendy-vscode.vsix --pat $OVSX_PAT",
+    "publish:all": "bash ./scripts/publish.sh"
   },
   "devDependencies": {
     "@types/mocha": "^10.0.10",
+    "ovsx": "^0.10.1",
     "@types/node": "20.x",
     "@types/uuid": "^9.0.8",
     "@typescript-eslint/eslint-plugin": "^8.28.0",
