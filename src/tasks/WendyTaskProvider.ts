@@ -126,10 +126,7 @@ export class WendyTaskProvider implements vscode.TaskProvider {
             args.push("--agent", currentDevice.address);
           }
 
-          const runtime = vscode.workspace.getConfiguration("wendyos").get<string>("runtime");
-          if (runtime) {
-            args.push("--runtime", runtime);
-          }
+          args.push("-y"); // Auto-confirm prompts
 
           // Add --debug parameter for debugging
           args.push("--debug");

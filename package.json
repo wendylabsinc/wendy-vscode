@@ -267,15 +267,6 @@
     "configuration": {
       "title": "WendyOS",
       "properties": {
-        "wendyos.runtime": {
-          "type": "string",
-          "default": "containerd",
-          "enum": [
-            "containerd",
-            "docker"
-          ],
-          "description": "The runtime to use when deploying to WendyOS. This can be either `containerd` or `docker`"
-        },
         "wendyos.cliPath": {
           "type": "string",
           "default": "",
@@ -283,7 +274,6 @@
         },
         "wendyos.swiftSdkPath": {
           "type": "string",
-          "default": "~/.swiftpm/swift-sdks/6.1-RELEASE_wendyos_aarch64.artifactbundle",
           "description": "Path to the WendyOS Swift SDK artifact bundle. Required for debugging. This setting will be removed once the Wendy CLI is capable of managing the SDK. This MUST point to the installation location of the 6.1-RELEASE_wendyos_aarch64 SDK."
         },
         "wendyos.devices": {
