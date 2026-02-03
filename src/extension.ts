@@ -24,6 +24,7 @@ import { WendyImager } from "./utilities/Imager";
 import { WendyProjectDetector } from "./utilities/WendyProjectDetector";
 import { makeDebugConfigurations, hasAnyWendyDebugConfiguration } from "./debugger/launch";
 import { EntitlementsEditorProvider } from "./editors/EntitlementsEditorProvider";
+import { TelemetryDashboardProvider } from "./telemetry/TelemetryDashboardProvider";
 
 export async function activate(
   context: vscode.ExtensionContext
@@ -644,18 +645,12 @@ export async function activate(
             return;
           }
 
-          const cli = await WendyCLI.create();
-          if (!cli) {
-            vscode.window.showErrorMessage("Wendy CLI not found");
-            return;
-          }
-
-          const terminal = vscode.window.createTerminal({
-            name: `Dashboard: ${targetItem.device.address}`,
-            shellPath: cli.path,
-            shellArgs: ['device', 'dashboard', '--device', targetItem.device.address]
-          });
-          terminal.show();
+          const dashboard = new TelemetryDashboardProvider(
+            context.extensionUri,
+            targetItem.device.address
+          );
+          context.subscriptions.push(dashboard);
+          await dashboard.show();
         }
       ),
 
