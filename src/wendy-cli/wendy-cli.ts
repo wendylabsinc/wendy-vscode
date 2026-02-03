@@ -85,4 +85,18 @@ export class WendyCLI {
   public async getVersion(): Promise<string> {
     return await this.exec(["--version"]);
   }
+
+  public async getInfo(): Promise<WendyInfo> {
+    const output = await this.exec(["info"]);
+    return JSON.parse(output);
+  }
+}
+
+export interface WendyInfo {
+  version: string;
+  swift: {
+    version: string;
+    sdk: string;
+    sdkDownloadURL: string;
+  };
 }

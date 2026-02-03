@@ -229,11 +229,6 @@
         "category": "Wendy"
       },
       {
-        "command": "wendy.configureSwiftSdkPath",
-        "title": "Configure Swift SDK Path",
-        "category": "Wendy"
-      },
-      {
         "command": "wendy.openEntitlementsEditor",
         "title": "Open Entitlements Editor",
         "category": "Wendy",
@@ -408,10 +403,6 @@
           "type": "string",
           "default": "",
           "description": "Path to the Wendy CLI executable. Leave empty for automatic detection."
-        },
-        "wendyos.swiftSdkPath": {
-          "type": "string",
-          "description": "Path to the WendyOS Swift SDK artifact bundle. Required for debugging. This setting will be removed once the Wendy CLI is capable of managing the SDK. This MUST point to the installation location of the 6.1-RELEASE_wendyos_aarch64 SDK."
         },
         "wendyos.devices": {
           "type": "array",

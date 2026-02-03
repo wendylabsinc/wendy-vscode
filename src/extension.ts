@@ -1056,15 +1056,6 @@ export async function activate(
         }
       ),
 
-      vscode.commands.registerCommand(
-        "wendy.configureSwiftSdkPath",
-        async () => {
-          await vscode.commands.executeCommand(
-            "workbench.action.openSettings",
-            "wendyos.swiftSdkPath"
-          );
-        }
-      )
     );
 
     const rootRevealCommandIds = [
@@ -1253,15 +1244,6 @@ export async function activate(
       }
     );
     context.subscriptions.push(refreshDebugConfigsCommand);
-
-    // Check if Swift SDK path is set
-    const config = vscode.workspace.getConfiguration("wendyos");
-    const sdkPath = config.get<string>("swiftSdkPath");
-    if (!sdkPath || sdkPath.trim() === "") {
-      outputChannel.appendLine(
-        "Swift SDK path is not set. Debugging may not work properly."
-      );
-    }
 
     // Note: Launch configuration generation is now handled directly in WendyWorkspaceContext
     // The configurations will be generated automatically when all folders are ready
