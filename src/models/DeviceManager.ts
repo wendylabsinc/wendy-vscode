@@ -60,6 +60,23 @@ export interface WifiConnectionResult {
   success: boolean;
 }
 
+export interface DeviceApp {
+  name: string;
+  version?: string;
+  runningState?: string;
+  failureCount?: number;
+}
+
+export interface HardwareDevice {
+  name: string;
+  category: string;
+  description?: string;
+  devicePath?: string;
+  properties?: Record<string, string>;
+}
+
+export type HardwareCategory = 'gpu' | 'usb' | 'i2c' | 'spi' | 'gpio' | 'camera' | 'audio' | 'input' | 'serial' | 'network' | 'storage';
+
 /**
  * Manages devices stored in VS Code configuration
  */
@@ -410,6 +427,228 @@ export class DeviceManager {
       }
     } else {
       this._onDevicesChanged.fire();
+    }
+  }
+
+  /**
+   * List apps on a device
+   */
+  async listApps(deviceAddress: string): Promise<DeviceApp[]> {
+    const cli = await WendyCLI.create();
+    if (!cli) {
+      throw new Error("Failed to create Wendy CLI");
+    }
+
+    const output = await new Promise<string>((resolve, reject) => {
+      exec(`${cli.path} --json device apps list --device ${deviceAddress}`, (error, stdout, stderr) => {
+        if (error) {
+          reject(new Error(stderr || error.message));
+          return;
+        }
+        resolve(stdout);
+      });
+    });
+
+    try {
+      const result = JSON.parse(output);
+      if (Array.isArray(result)) {
+        return result;
+      }
+      if (result.apps && Array.isArray(result.apps)) {
+        return result.apps;
+      }
+      return [];
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Start an app on a device
+   */
+  async startApp(deviceAddress: string, appName: string): Promise<void> {
+    const cli = await WendyCLI.create();
+    if (!cli) {
+      throw new Error("Failed to create Wendy CLI");
+    }
+
+    await new Promise<void>((resolve, reject) => {
+      exec(`${cli.path} device apps start "${appName}" --device ${deviceAddress}`, (error, stdout, stderr) => {
+        if (error) {
+          reject(new Error(stderr || error.message));
+          return;
+        }
+        resolve();
+      });
+    });
+
+    this._onDevicesChanged.fire();
+  }
+
+  /**
+   * Stop an app on a device
+   */
+  async stopApp(deviceAddress: string, appName: string): Promise<void> {
+    const cli = await WendyCLI.create();
+    if (!cli) {
+      throw new Error("Failed to create Wendy CLI");
+    }
+
+    await new Promise<void>((resolve, reject) => {
+      exec(`${cli.path} device apps stop "${appName}" --device ${deviceAddress}`, (error, stdout, stderr) => {
+        if (error) {
+          reject(new Error(stderr || error.message));
+          return;
+        }
+        resolve();
+      });
+    });
+
+    this._onDevicesChanged.fire();
+  }
+
+  /**
+   * Remove an app from a device
+   */
+  async removeApp(deviceAddress: string, appName: string, purgeImage: boolean = false): Promise<void> {
+    const cli = await WendyCLI.create();
+    if (!cli) {
+      throw new Error("Failed to create Wendy CLI");
+    }
+
+    let args = `device apps remove "${appName}" --device ${deviceAddress}`;
+    if (purgeImage) {
+      args += ' --purge-image';
+    }
+
+    await new Promise<void>((resolve, reject) => {
+      exec(`${cli.path} ${args}`, (error, stdout, stderr) => {
+        if (error) {
+          reject(new Error(stderr || error.message));
+          return;
+        }
+        resolve();
+      });
+    });
+
+    this._onDevicesChanged.fire();
+  }
+
+  /**
+   * Get WiFi connection status
+   */
+  async getWifiStatus(deviceAddress: string): Promise<WifiStatus> {
+    const cli = await WendyCLI.create();
+    if (!cli) {
+      throw new Error("Failed to create Wendy CLI");
+    }
+
+    const output = await new Promise<string>((resolve, reject) => {
+      exec(`${cli.path} --json device wifi status --device ${deviceAddress}`, (error, stdout, stderr) => {
+        if (error) {
+          reject(new Error(stderr || error.message));
+          return;
+        }
+        resolve(stdout);
+      });
+    });
+
+    // The CLI outputs multiple JSON objects - find the WiFi status one
+    const lines = output.trim().split('\n');
+    for (let i = lines.length - 1; i >= 0; i--) {
+      try {
+        const parsed = JSON.parse(lines[i]);
+        // Look for the WiFi status object (has 'connected' field)
+        if ('connected' in parsed) {
+          return parsed;
+        }
+      } catch {
+        // Continue to next line
+      }
+    }
+
+    throw new Error("Failed to parse WiFi status");
+  }
+
+  /**
+   * Disconnect from WiFi
+   */
+  async disconnectWifi(deviceAddress: string): Promise<void> {
+    const cli = await WendyCLI.create();
+    if (!cli) {
+      throw new Error("Failed to create Wendy CLI");
+    }
+
+    await new Promise<void>((resolve, reject) => {
+      exec(`${cli.path} device wifi disconnect --device ${deviceAddress}`, (error, stdout, stderr) => {
+        if (error) {
+          reject(new Error(stderr || error.message));
+          return;
+        }
+        resolve();
+      });
+    });
+  }
+
+  /**
+   * Get hardware information for a device
+   */
+  async getHardware(deviceAddress: string, category?: HardwareCategory): Promise<HardwareDevice[]> {
+    const cli = await WendyCLI.create();
+    if (!cli) {
+      throw new Error("Failed to create Wendy CLI");
+    }
+
+    let args = `--json device hardware --device ${deviceAddress}`;
+    if (category) {
+      args += ` --category ${category}`;
+    }
+
+    const output = await new Promise<string>((resolve, reject) => {
+      exec(`${cli.path} ${args}`, (error, stdout, stderr) => {
+        if (error) {
+          reject(new Error(stderr || error.message));
+          return;
+        }
+        resolve(stdout);
+      });
+    });
+
+    try {
+      // The CLI outputs multiple JSON objects (events first, then data)
+      // Find the array in the output
+      const lines = output.trim().split('\n');
+      for (const line of lines) {
+        try {
+          const parsed = JSON.parse(line);
+          if (Array.isArray(parsed)) {
+            return parsed;
+          }
+        } catch {
+          // Continue to next line
+        }
+      }
+
+      // Try parsing entire output as JSON
+      const result = JSON.parse(output);
+      if (Array.isArray(result)) {
+        return result;
+      }
+      if (result.hardware && Array.isArray(result.hardware)) {
+        return result.hardware;
+      }
+      return [];
+    } catch {
+      // Try to find array in concatenated JSON output
+      const arrayMatch = output.match(/\[[\s\S]*\]/);
+      if (arrayMatch) {
+        try {
+          return JSON.parse(arrayMatch[0]);
+        } catch {
+          return [];
+        }
+      }
+      return [];
     }
   }
 }
