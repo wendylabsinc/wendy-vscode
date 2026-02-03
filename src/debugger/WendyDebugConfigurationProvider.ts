@@ -357,10 +357,8 @@ export class WendyDebugConfigurationProvider
     const swiftlyLldbDap = path.join(os.homedir(), ".swiftly", "bin", "lldb-dap");
 
     // SDK path commands for Swift expression evaluation
-    // Use Linux.sdk symlink - LLDB requires this name for Linux targets
-    const linuxSdkPath = `${sdkBundle}.artifactbundle/${sdkBundle}/aarch64-unknown-linux-gnu/Linux.sdk`;
     const sdkPathCommands = [
-      `settings set target.sdk-path "${path.join(sdkPath, linuxSdkPath)}"`,
+      `settings set target.sdk-path "${path.join(sdkPath, sdkSubPath)}"`,
       `settings set target.swift-module-search-paths "${path.join(
         sdkPath,
         moduleSubPath
