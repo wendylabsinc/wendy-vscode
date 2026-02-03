@@ -207,7 +207,7 @@ export class DeviceManager {
     }
 
     const output = await new Promise<string>((resolve, reject) => {
-      exec(`${cli.path} device version --agent ${device.address} --json --check-updates --prerelease`, (error, stdout) => {
+      exec(`${cli.path} device version --device ${device.address} --json --check-updates --prerelease`, (error, stdout) => {
         if (error) {
           reject(error);
         }
@@ -307,7 +307,7 @@ export class DeviceManager {
     }, async () => {
       try {
         await new Promise<string>((resolve, reject) => {
-          exec(`${cli.path} agent update --agent ${device.address}`, (error, stdout) => {
+          exec(`${cli.path} agent update --device ${device.address}`, (error, stdout) => {
             if (error) {
               reject(error);
             }
@@ -345,7 +345,7 @@ export class DeviceManager {
     }
 
     let output = await new Promise<string>((resolve, reject) => {
-      exec(`${cli.path} wifi list --agent ${device.address} --json`, (error, stdout) => {
+      exec(`${cli.path} wifi list --device ${device.address} --json`, (error, stdout) => {
         if (error) {
           reject(error);
         }
@@ -376,7 +376,7 @@ export class DeviceManager {
     }
 
     output = await new Promise<string>((resolve, reject) => {
-      exec(`${cli.path} wifi connect \"${network.label}\" --agent ${device.address} --password \"${password}\" --json`, (error, stdout, stderr) => {
+      exec(`${cli.path} wifi connect \"${network.label}\" --device ${device.address} --password \"${password}\" --json`, (error, stdout, stderr) => {
         if (error) {
           reject(error);
         }

@@ -120,10 +120,10 @@ export class WendyTaskProvider implements vscode.TaskProvider {
           // Clone the args array
           const args = [...config.args];
 
-          // Add --agent parameter if there's a current device
+          // Add --device parameter if there's a current device
           const currentDevice = await this.deviceManager.getCurrentDevice();
           if (currentDevice) {
-            args.push("--agent", currentDevice.address);
+            args.push("--device", currentDevice.address);
           }
 
           args.push("-y"); // Auto-confirm prompts
@@ -189,10 +189,10 @@ export class WendyTaskProvider implements vscode.TaskProvider {
           // Clone the args array
           const args = [...definition.args];
 
-          // Add --agent parameter if there's a current device
+          // Add --device parameter if there's a current device
           const currentDevice = await this.deviceManager.getCurrentDevice();
           if (currentDevice) {
-            args.push("--agent", currentDevice.address);
+            args.push("--device", currentDevice.address);
           }
 
           // Add --debug parameter for debugging
