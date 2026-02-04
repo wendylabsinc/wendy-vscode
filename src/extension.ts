@@ -9,8 +9,10 @@ import { WendyTaskProvider } from "./tasks/WendyTaskProvider";
 import * as path from "path";
 import * as fs from "fs/promises";
 import { DocumentationProvider } from "./sidebar/DocumentationProvider";
-import { DevicesProvider, DeviceTreeItem } from "./sidebar/DevicesProvider";
+import { DevicesProvider, DeviceTreeItem, AppTreeItem } from "./sidebar/DevicesProvider";
 import { DeviceManager, LANDevice } from "./models/DeviceManager";
+import { ProjectManager, EntitlementType } from "./models/ProjectManager";
+import { HardwareProvider } from "./sidebar/HardwareProvider";
 import { DiskManager } from "./models/DiskManager";
 import { WendyDebugConfigurationProvider, WENDY_LAUNCH_CONFIG_TYPE } from "./debugger/WendyDebugConfigurationProvider";
 import { DisksProvider } from "./sidebar/DisksProvider";
@@ -21,6 +23,8 @@ import {
 import { WendyImager } from "./utilities/Imager";
 import { WendyProjectDetector } from "./utilities/WendyProjectDetector";
 import { makeDebugConfigurations, hasAnyWendyDebugConfiguration } from "./debugger/launch";
+import { EntitlementsEditorProvider } from "./editors/EntitlementsEditorProvider";
+import { TelemetryDashboardProvider } from "./telemetry/TelemetryDashboardProvider";
 
 export async function activate(
   context: vscode.ExtensionContext
@@ -40,6 +44,7 @@ export async function activate(
     // Create the DeviceManager
     const deviceManager = new DeviceManager();
     const diskManager = new DiskManager(outputChannel);
+    const projectManager = new ProjectManager(outputChannel);
 
     // Register the devices provider
     const devicesProvider = new DevicesProvider(deviceManager);
@@ -51,6 +56,10 @@ export async function activate(
     // Register the disks provider
     const disksProvider = new DisksProvider(diskManager);
     vscode.window.registerTreeDataProvider("wendyDisks", disksProvider);
+
+    // Register the hardware provider
+    const hardwareProvider = new HardwareProvider(deviceManager);
+    vscode.window.registerTreeDataProvider("wendyHardware", hardwareProvider);
 
     const operatingSystemCacheProvider = new OperatingSystemCacheProvider();
     const operatingSystemCacheTreeView = vscode.window.createTreeView(
@@ -69,7 +78,11 @@ export async function activate(
         return item;
       }
 
-      return devicesTreeView.selection?.[0];
+      const selected = devicesTreeView.selection?.[0];
+      if (selected instanceof DeviceTreeItem) {
+        return selected;
+      }
+      return undefined;
     };
 
     const copyDeviceValue = async (
@@ -532,6 +545,431 @@ export async function activate(
         }
       ),
 
+      // WiFi status command
+      vscode.commands.registerCommand(
+        "wendyDevices.wifiStatus",
+        async (item: DeviceTreeItem | undefined) => {
+          const targetItem = getTargetDeviceTreeItem(item);
+          if (!targetItem) {
+            return;
+          }
+          try {
+            const status = await deviceManager.getWifiStatus(targetItem.device.address);
+            if (status.connected) {
+              vscode.window.showInformationMessage(
+                `Connected to WiFi network: ${status.ssid}`
+              );
+            } else {
+              vscode.window.showInformationMessage("Not connected to WiFi");
+            }
+          } catch (error) {
+            vscode.window.showErrorMessage(
+              `Failed to get WiFi status: ${getErrorDescription(error)}`
+            );
+          }
+        }
+      ),
+
+      // WiFi disconnect command
+      vscode.commands.registerCommand(
+        "wendyDevices.disconnectWifi",
+        async (item: DeviceTreeItem | undefined) => {
+          const targetItem = getTargetDeviceTreeItem(item);
+          if (!targetItem) {
+            return;
+          }
+          try {
+            await deviceManager.disconnectWifi(targetItem.device.address);
+            vscode.window.showInformationMessage("Disconnected from WiFi");
+          } catch (error) {
+            vscode.window.showErrorMessage(
+              `Failed to disconnect WiFi: ${getErrorDescription(error)}`
+            );
+          }
+        }
+      ),
+
+      // Show logs command
+      vscode.commands.registerCommand(
+        "wendyDevices.showLogs",
+        async (item: DeviceTreeItem | undefined) => {
+          const targetItem = getTargetDeviceTreeItem(item);
+          if (!targetItem) {
+            return;
+          }
+
+          const cli = await WendyCLI.create();
+          if (!cli) {
+            vscode.window.showErrorMessage("Wendy CLI not found");
+            return;
+          }
+
+          // Ask for optional app filter
+          const apps = await deviceManager.listApps(targetItem.device.address).catch(() => []);
+          let appFilter: string | undefined;
+
+          if (apps.length > 0) {
+            const appChoice = await vscode.window.showQuickPick(
+              [{ label: "All Apps", value: undefined }, ...apps.map(a => ({ label: a.name, value: a.name }))],
+              { placeHolder: "Filter logs by app (optional)" }
+            );
+            appFilter = appChoice?.value;
+          }
+
+          // Ask for log level
+          const levelChoice = await vscode.window.showQuickPick(
+            ['trace', 'debug', 'info', 'warn', 'error', 'fatal'].map(l => ({ label: l, value: l })),
+            { placeHolder: "Minimum log level (optional)" }
+          );
+
+          const terminal = vscode.window.createTerminal({
+            name: `Logs: ${targetItem.device.address}`,
+            shellPath: cli.path,
+            shellArgs: [
+              'device', 'logs',
+              '--device', targetItem.device.address,
+              ...(appFilter ? ['--app', appFilter] : []),
+              ...(levelChoice ? ['--level', levelChoice.value] : [])
+            ]
+          });
+          terminal.show();
+        }
+      ),
+
+      // Show dashboard command
+      vscode.commands.registerCommand(
+        "wendyDevices.showDashboard",
+        async (item: DeviceTreeItem | undefined) => {
+          const targetItem = getTargetDeviceTreeItem(item);
+          if (!targetItem) {
+            return;
+          }
+
+          const dashboard = new TelemetryDashboardProvider(
+            context.extensionUri,
+            targetItem.device.address
+          );
+          context.subscriptions.push(dashboard);
+          await dashboard.show();
+        }
+      ),
+
+      // Show hardware command
+      vscode.commands.registerCommand(
+        "wendyDevices.showHardware",
+        async (item: DeviceTreeItem | undefined) => {
+          const targetItem = getTargetDeviceTreeItem(item);
+          if (!targetItem) {
+            return;
+          }
+
+          // Set current device and focus hardware view
+          await deviceManager.setCurrentDevice(targetItem.device.id);
+          vscode.commands.executeCommand("wendyHardware.focus");
+        }
+      ),
+
+      // Device setup command
+      vscode.commands.registerCommand(
+        "wendyDevices.deviceSetup",
+        async (item: DeviceTreeItem | undefined) => {
+          const targetItem = getTargetDeviceTreeItem(item);
+          if (!targetItem) {
+            return;
+          }
+
+          const cli = await WendyCLI.create();
+          if (!cli) {
+            vscode.window.showErrorMessage("Wendy CLI not found");
+            return;
+          }
+
+          const terminal = vscode.window.createTerminal({
+            name: `Setup: ${targetItem.device.address}`,
+            shellPath: cli.path,
+            shellArgs: ['device', 'setup', '--device', targetItem.device.address]
+          });
+          terminal.show();
+        }
+      ),
+
+      // Start app command
+      vscode.commands.registerCommand(
+        "wendyApps.startApp",
+        async (item: AppTreeItem) => {
+          if (!item) {
+            return;
+          }
+          try {
+            await deviceManager.startApp(item.deviceAddress, item.app.name);
+            vscode.window.showInformationMessage(`App "${item.app.name}" started`);
+            devicesProvider.refresh();
+          } catch (error) {
+            vscode.window.showErrorMessage(
+              `Failed to start app: ${getErrorDescription(error)}`
+            );
+          }
+        }
+      ),
+
+      // Stop app command
+      vscode.commands.registerCommand(
+        "wendyApps.stopApp",
+        async (item: AppTreeItem) => {
+          if (!item) {
+            return;
+          }
+          const confirmed = await vscode.window.showWarningMessage(
+            `Stop app "${item.app.name}"?`,
+            { modal: true },
+            "Stop"
+          );
+          if (confirmed === "Stop") {
+            try {
+              await deviceManager.stopApp(item.deviceAddress, item.app.name);
+              vscode.window.showInformationMessage(`App "${item.app.name}" stopped`);
+              devicesProvider.refresh();
+            } catch (error) {
+              vscode.window.showErrorMessage(
+                `Failed to stop app: ${getErrorDescription(error)}`
+              );
+            }
+          }
+        }
+      ),
+
+      // Remove app command
+      vscode.commands.registerCommand(
+        "wendyApps.removeApp",
+        async (item: AppTreeItem) => {
+          if (!item) {
+            return;
+          }
+          const choice = await vscode.window.showWarningMessage(
+            `Remove app "${item.app.name}"? This will stop the app and remove it from the device.`,
+            { modal: true },
+            "Remove",
+            "Remove & Purge Image"
+          );
+          if (choice === "Remove" || choice === "Remove & Purge Image") {
+            try {
+              await deviceManager.removeApp(
+                item.deviceAddress,
+                item.app.name,
+                choice === "Remove & Purge Image"
+              );
+              vscode.window.showInformationMessage(`App "${item.app.name}" removed`);
+              devicesProvider.refresh();
+            } catch (error) {
+              vscode.window.showErrorMessage(
+                `Failed to remove app: ${getErrorDescription(error)}`
+              );
+            }
+          }
+        }
+      ),
+
+      // Hardware refresh command
+      vscode.commands.registerCommand("wendyHardware.refresh", () => {
+        hardwareProvider.refresh();
+      }),
+
+      // Hardware terminal command
+      vscode.commands.registerCommand("wendyHardware.openTerminal", async (deviceAddress?: string) => {
+        const address = deviceAddress || deviceManager.getCurrentDevice()?.address;
+        if (!address) {
+          vscode.window.showErrorMessage("No device selected");
+          return;
+        }
+
+        const cli = await WendyCLI.create();
+        if (!cli) {
+          vscode.window.showErrorMessage("Wendy CLI not found");
+          return;
+        }
+
+        const terminal = vscode.window.createTerminal({
+          name: `Hardware: ${address}`,
+          shellPath: cli.path,
+          shellArgs: ['device', 'hardware', '--device', address]
+        });
+        terminal.show();
+      }),
+
+      // Project init command
+      vscode.commands.registerCommand("wendy.initProject", async () => {
+        const language = await vscode.window.showQuickPick(
+          [
+            { label: "Swift", value: "swift" as const },
+            { label: "Python", value: "python" as const }
+          ],
+          { placeHolder: "Select project language" }
+        );
+        if (!language) {
+          return;
+        }
+
+        const folderUri = await vscode.window.showOpenDialog({
+          canSelectFiles: false,
+          canSelectFolders: true,
+          canSelectMany: false,
+          openLabel: "Select Project Location"
+        });
+        if (!folderUri || folderUri.length === 0) {
+          return;
+        }
+
+        try {
+          await projectManager.initProject(folderUri[0].fsPath, language.value);
+          vscode.window.showInformationMessage(
+            `Wendy ${language.label} project initialized successfully`
+          );
+          // Offer to open the folder
+          const openChoice = await vscode.window.showInformationMessage(
+            "Would you like to open the new project?",
+            "Open Folder"
+          );
+          if (openChoice === "Open Folder") {
+            vscode.commands.executeCommand("vscode.openFolder", folderUri[0]);
+          }
+        } catch (error) {
+          vscode.window.showErrorMessage(
+            `Failed to initialize project: ${getErrorDescription(error)}`
+          );
+        }
+      }),
+
+      // Project build command
+      vscode.commands.registerCommand("wendy.buildProject", async () => {
+        const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+        if (!workspaceFolder) {
+          vscode.window.showErrorMessage("No workspace folder open");
+          return;
+        }
+
+        const currentDevice = deviceManager.getCurrentDevice();
+
+        try {
+          await vscode.window.withProgress(
+            {
+              location: vscode.ProgressLocation.Notification,
+              title: "Building Wendy project...",
+              cancellable: false
+            },
+            async () => {
+              await projectManager.buildProject(
+                workspaceFolder.uri.fsPath,
+                undefined,
+                currentDevice?.address
+              );
+            }
+          );
+          vscode.window.showInformationMessage("Project built successfully");
+        } catch (error) {
+          vscode.window.showErrorMessage(
+            `Failed to build project: ${getErrorDescription(error)}`
+          );
+        }
+      }),
+
+      // Manage entitlements command
+      vscode.commands.registerCommand("wendy.manageEntitlements", async () => {
+        const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+        if (!workspaceFolder) {
+          vscode.window.showErrorMessage("No workspace folder open");
+          return;
+        }
+
+        const action = await vscode.window.showQuickPick(
+          [
+            { label: "List Entitlements", value: "list" },
+            { label: "Add Entitlement", value: "add" },
+            { label: "Remove Entitlement", value: "remove" }
+          ],
+          { placeHolder: "Select action" }
+        );
+        if (!action) {
+          return;
+        }
+
+        const projectPath = workspaceFolder.uri.fsPath;
+
+        if (action.value === "list") {
+          try {
+            const entitlements = await projectManager.listEntitlements(projectPath, true);
+            if (entitlements.length === 0) {
+              vscode.window.showInformationMessage("No entitlements configured");
+            } else {
+              const items = entitlements.map(e => ({
+                label: e.type,
+                description: e.enabled ? "Enabled" : "Disabled",
+                detail: e.mode ? `Mode: ${e.mode}` : undefined
+              }));
+              await vscode.window.showQuickPick(items, { placeHolder: "Project entitlements" });
+            }
+          } catch (error) {
+            vscode.window.showErrorMessage(
+              `Failed to list entitlements: ${getErrorDescription(error)}`
+            );
+          }
+        } else if (action.value === "add") {
+          const entitlementTypes: EntitlementType[] = ['network', 'video', 'audio', 'bluetooth', 'gpu', 'persist'];
+          const type = await vscode.window.showQuickPick(
+            entitlementTypes.map(t => ({ label: t, value: t })),
+            { placeHolder: "Select entitlement type" }
+          );
+          if (!type) {
+            return;
+          }
+
+          try {
+            await projectManager.addEntitlement(projectPath, type.value);
+            vscode.window.showInformationMessage(`Entitlement "${type.value}" added`);
+          } catch (error) {
+            vscode.window.showErrorMessage(
+              `Failed to add entitlement: ${getErrorDescription(error)}`
+            );
+          }
+        } else if (action.value === "remove") {
+          try {
+            const entitlements = await projectManager.listEntitlements(projectPath);
+            if (entitlements.length === 0) {
+              vscode.window.showInformationMessage("No entitlements to remove");
+              return;
+            }
+            const toRemove = await vscode.window.showQuickPick(
+              entitlements.map(e => ({ label: e.type, value: e.type as EntitlementType })),
+              { placeHolder: "Select entitlement to remove" }
+            );
+            if (!toRemove) {
+              return;
+            }
+            await projectManager.removeEntitlement(projectPath, toRemove.value);
+            vscode.window.showInformationMessage(`Entitlement "${toRemove.value}" removed`);
+          } catch (error) {
+            vscode.window.showErrorMessage(
+              `Failed to remove entitlement: ${getErrorDescription(error)}`
+            );
+          }
+        }
+      }),
+
+      // Analytics status command
+      vscode.commands.registerCommand("wendy.analyticsStatus", async () => {
+        const cli = await WendyCLI.create();
+        if (!cli) {
+          vscode.window.showErrorMessage("Wendy CLI not found");
+          return;
+        }
+
+        const terminal = vscode.window.createTerminal({
+          name: "Wendy Analytics",
+          shellPath: cli.path,
+          shellArgs: ['analytics', 'status', '--verbose']
+        });
+        terminal.show();
+      }),
+
       vscode.commands.registerCommand(
         "wendyDisks.refreshDisks",
         () => {
@@ -618,15 +1056,6 @@ export async function activate(
         }
       ),
 
-      vscode.commands.registerCommand(
-        "wendy.configureSwiftSdkPath",
-        async () => {
-          await vscode.commands.executeCommand(
-            "workbench.action.openSettings",
-            "wendyos.swiftSdkPath"
-          );
-        }
-      )
     );
 
     const rootRevealCommandIds = [
@@ -658,6 +1087,11 @@ export async function activate(
     vscode.window.registerTreeDataProvider(
       "wendyDocumentation",
       documentationProvider
+    );
+
+    // Register the entitlements editor provider
+    context.subscriptions.push(
+      ...EntitlementsEditorProvider.register(context)
     );
 
     // Listen for configuration changes to the CLI path
@@ -810,15 +1244,6 @@ export async function activate(
       }
     );
     context.subscriptions.push(refreshDebugConfigsCommand);
-
-    // Check if Swift SDK path is set
-    const config = vscode.workspace.getConfiguration("wendyos");
-    const sdkPath = config.get<string>("swiftSdkPath");
-    if (!sdkPath || sdkPath.trim() === "") {
-      outputChannel.appendLine(
-        "Swift SDK path is not set. Debugging may not work properly."
-      );
-    }
 
     // Note: Launch configuration generation is now handled directly in WendyWorkspaceContext
     // The configurations will be generated automatically when all folders are ready

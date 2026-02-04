@@ -54,6 +54,10 @@
           "name": "Devices"
         },
         {
+          "id": "wendyHardware",
+          "name": "Hardware"
+        },
+        {
           "id": "wendyDisks",
           "name": "Disks"
         },
@@ -68,6 +72,26 @@
       ]
     },
     "commands": [
+      {
+        "command": "wendy.initProject",
+        "title": "Initialize New Project",
+        "category": "Wendy"
+      },
+      {
+        "command": "wendy.buildProject",
+        "title": "Build Project",
+        "category": "Wendy"
+      },
+      {
+        "command": "wendy.manageEntitlements",
+        "title": "Manage Entitlements",
+        "category": "Wendy"
+      },
+      {
+        "command": "wendy.analyticsStatus",
+        "title": "Analytics Status",
+        "category": "Wendy"
+      },
       {
         "command": "wendyDevices.addDevice",
         "title": "Add Device",
@@ -112,6 +136,51 @@
         "command": "wendyDevices.selectDevice",
         "title": "Set as Current Device",
         "icon": "$(check)"
+      },
+      {
+        "command": "wendyDevices.showHardware",
+        "title": "Show Hardware",
+        "category": "Wendy"
+      },
+      {
+        "command": "wendyDevices.deviceSetup",
+        "title": "Device Setup",
+        "category": "Wendy"
+      },
+      {
+        "command": "wendyDevices.wifiStatus",
+        "title": "WiFi Status",
+        "category": "Wendy"
+      },
+      {
+        "command": "wendyDevices.disconnectWifi",
+        "title": "Disconnect WiFi",
+        "category": "Wendy"
+      },
+      {
+        "command": "wendyDevices.showLogs",
+        "title": "Show Logs",
+        "category": "Wendy"
+      },
+      {
+        "command": "wendyDevices.showDashboard",
+        "title": "Show Dashboard",
+        "category": "Wendy"
+      },
+      {
+        "command": "wendyApps.startApp",
+        "title": "Start App",
+        "icon": "$(play)"
+      },
+      {
+        "command": "wendyApps.stopApp",
+        "title": "Stop App",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "wendyApps.removeApp",
+        "title": "Remove App",
+        "icon": "$(trash)"
       },
       {
         "command": "wendyDisks.flashDisk",
@@ -160,12 +229,25 @@
         "category": "Wendy"
       },
       {
-        "command": "wendy.configureSwiftSdkPath",
-        "title": "Configure Swift SDK Path",
-        "category": "Wendy"
+        "command": "wendy.openEntitlementsEditor",
+        "title": "Open Entitlements Editor",
+        "category": "Wendy",
+        "icon": "$(shield)"
+      },
+      {
+        "command": "wendyHardware.refresh",
+        "title": "Refresh Hardware",
+        "icon": "$(refresh)"
       }
     ],
     "menus": {
+      "editor/title": [
+        {
+          "command": "wendy.openEntitlementsEditor",
+          "when": "resourceFilename == wendy.json",
+          "group": "navigation"
+        }
+      ],
       "view/title": [
         {
           "command": "wendyDevices.addDevice",
@@ -180,6 +262,11 @@
         {
           "command": "wendyDisks.refreshDisks",
           "when": "view == wendyDisks",
+          "group": "navigation"
+        },
+        {
+          "command": "wendyHardware.refresh",
+          "when": "view == wendyHardware",
           "group": "navigation"
         },
         {
@@ -230,6 +317,51 @@
           "group": "inline"
         },
         {
+          "command": "wendyDevices.wifiStatus",
+          "when": "view == wendyDevices && viewItem =~ /device/",
+          "group": "wifi@0"
+        },
+        {
+          "command": "wendyDevices.disconnectWifi",
+          "when": "view == wendyDevices && viewItem =~ /device/",
+          "group": "wifi@1"
+        },
+        {
+          "command": "wendyDevices.showLogs",
+          "when": "view == wendyDevices && viewItem =~ /device/",
+          "group": "observability@0"
+        },
+        {
+          "command": "wendyDevices.showDashboard",
+          "when": "view == wendyDevices && viewItem =~ /device/",
+          "group": "observability@1"
+        },
+        {
+          "command": "wendyDevices.showHardware",
+          "when": "view == wendyDevices && viewItem =~ /device/",
+          "group": "device@0"
+        },
+        {
+          "command": "wendyDevices.deviceSetup",
+          "when": "view == wendyDevices && viewItem =~ /device/",
+          "group": "device@1"
+        },
+        {
+          "command": "wendyApps.startApp",
+          "when": "view == wendyDevices && viewItem == app-stopped",
+          "group": "inline"
+        },
+        {
+          "command": "wendyApps.stopApp",
+          "when": "view == wendyDevices && viewItem == app-running",
+          "group": "inline"
+        },
+        {
+          "command": "wendyApps.removeApp",
+          "when": "view == wendyDevices && viewItem =~ /^app-/",
+          "group": "inline"
+        },
+        {
           "command": "wendyDisks.flashDisk",
           "when": "view == wendyDisks && viewItem == disk",
           "group": "inline"
@@ -267,24 +399,10 @@
     "configuration": {
       "title": "WendyOS",
       "properties": {
-        "wendyos.runtime": {
-          "type": "string",
-          "default": "containerd",
-          "enum": [
-            "containerd",
-            "docker"
-          ],
-          "description": "The runtime to use when deploying to WendyOS. This can be either `containerd` or `docker`"
-        },
         "wendyos.cliPath": {
           "type": "string",
           "default": "",
           "description": "Path to the Wendy CLI executable. Leave empty for automatic detection."
-        },
-        "wendyos.swiftSdkPath": {
-          "type": "string",
-          "default": "~/.swiftpm/swift-sdks/6.1-RELEASE_wendyos_aarch64.artifactbundle",
-          "description": "Path to the WendyOS Swift SDK artifact bundle. Required for debugging. This setting will be removed once the Wendy CLI is capable of managing the SDK. This MUST point to the installation location of the 6.1-RELEASE_wendyos_aarch64 SDK."
         },
         "wendyos.devices": {
           "type": "array",
@@ -312,7 +430,7 @@
         "wendy.cache.root": {
           "type": "string",
           "default": "",
-          "description": "Root directory that the Operating System Cache view displays. Leave empty to use the default cache path for your OS (`~/.wendy/cache` on macOS/Linux, `%LOCALAPPDATA%\\Wendy\\cache` on Windows). Supports `~` expansion."
+          "description": "Root directory that the Operating System Cache view displays. Leave empty to use the default cache path for your OS (`~/Library/Caches/.wendy/images` on macOS, `~/.cache/.wendy/images` on Linux, `%LOCALAPPDATA%\\.wendy\\images` on Windows). Supports `~` expansion."
         }
       }
     },

@@ -184,10 +184,16 @@ export class OperatingSystemCacheProvider
       const localAppData =
         process.env.LOCALAPPDATA ||
         path.join(os.homedir(), "AppData", "Local");
-      return path.join(localAppData, "Wendy", "cache");
+      return path.join(localAppData, ".wendy", "images");
     }
 
-    return path.join(os.homedir(), ".wendy", "cache");
+    if (process.platform === "darwin") {
+      return path.join(os.homedir(), "Library", "Caches", ".wendy", "images");
+    }
+
+    // Linux: use XDG_CACHE_HOME or fallback to ~/.cache
+    const xdgCache = process.env.XDG_CACHE_HOME || path.join(os.homedir(), ".cache");
+    return path.join(xdgCache, ".wendy", "images");
   }
 
   private expandHome(targetPath: string): string {

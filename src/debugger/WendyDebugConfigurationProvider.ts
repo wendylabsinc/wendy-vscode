@@ -1,13 +1,28 @@
 import * as vscode from "vscode";
 import * as path from "path";
+import * as dns from "dns";
 import { WendyCLI } from "../wendy-cli/wendy-cli";
 import { WendyWorkspaceContext } from "../WendyWorkspaceContext";
 import { DeviceManager } from "../models/DeviceManager";
 import { getErrorDescription } from "../utilities/utilities";
-import { realpath } from "fs/promises";
 import * as os from "os";
-import { debug } from "console";
 import { warnMissingPythonExtension } from "../utilities/PythonExtensionNotifications";
+
+/**
+ * Resolve a hostname to an IPv4 address.
+ * This is needed because LLDB has issues with .local mDNS hostnames.
+ */
+async function resolveHostname(hostname: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    dns.lookup(hostname, { family: 4 }, (err, address) => {
+      if (err) {
+        reject(err);
+      } else {
+        resolve(address);
+      }
+    });
+  });
+}
 
 export const WENDY_LAUNCH_CONFIG_TYPE = "wendy";
 // Default debug port used by Wendy agent
@@ -290,68 +305,58 @@ export class WendyDebugConfigurationProvider
     token?: vscode.CancellationToken,
     wendyConfig?: WendyConfig
   ): Promise<vscode.DebugConfiguration | undefined | null> {
-    // Check if Swift SDK path is set
-    const config = vscode.workspace.getConfiguration("wendyos");
-    let sdkPath = config.get<string>("swiftSdkPath");
-
-    if (!sdkPath || sdkPath.trim() === "") {
-      const actions = ["Configure Swift SDK Path", "Cancel"];
-      const selection = await vscode.window.showErrorMessage(
-        "Swift SDK path is not set. This is required for debugging WendyOS applications.",
-        ...actions
-      );
-
-      if (selection === "Configure Swift SDK Path") {
-        await vscode.commands.executeCommand("wendy.configureSwiftSdkPath");
-      }
-
-      return null; // Cancel debugging
-    }
-
+    // Get SDK info from wendy CLI
+    let wendyInfo;
     try {
-      // NodeJS realpath does not expand ~, so we need to do it manually
-      if (sdkPath.startsWith("~")) {
-        sdkPath = path.join(os.homedir(), sdkPath.slice(1));
-      }
-
-      // Expand the SDK path to the real path
-      sdkPath = await realpath(sdkPath);
-      // Check if the SDK path exists
-      await vscode.workspace.fs.stat(vscode.Uri.file(sdkPath));
+      wendyInfo = await this.cli.getInfo();
     } catch (error) {
-      const actions = ["Configure Swift SDK Path", "Cancel"];
-      const selection = await vscode.window.showErrorMessage(
-        `The configured Swift SDK path "${sdkPath}" does not exist: ${getErrorDescription(
-          error
-        )}`,
-        ...actions
+      vscode.window.showErrorMessage(
+        `Failed to get Wendy info: ${getErrorDescription(error)}. Please ensure the Wendy CLI is installed.`
       );
-
-      if (selection === "Configure Swift SDK Path") {
-        await vscode.commands.executeCommand("wendy.configureSwiftSdkPath");
-      }
-
-      return null; // Cancel debugging
+      return null;
     }
 
-    const remoteAddress = await this.selectCurrentDevice(folder, DEFAULT_DEBUG_PORT);
+    const sdkPath = path.join(os.homedir(), ".swiftpm", "swift-sdks");
+    const sdkBundle = wendyInfo.swift.sdk;
+
+    this.outputChannel.appendLine(`Swift version: ${wendyInfo.swift.version}`);
+    this.outputChannel.appendLine(`Using SDK: ${sdkBundle}`);
+
+    let remoteAddress = await this.selectCurrentDevice(folder, DEFAULT_DEBUG_PORT);
     if (!remoteAddress) {
       return null; // Cancel debugging
+    }
+
+    // Resolve .local hostnames to IP addresses to work around LLDB bug
+    // that incorrectly wraps .local hostnames in brackets
+    const [host, port] = remoteAddress.split(":");
+    if (host.endsWith(".local")) {
+      try {
+        const ip = await resolveHostname(host);
+        remoteAddress = `${ip}:${port}`;
+        this.outputChannel.appendLine(`Resolved ${host} to ${ip}`);
+      } catch (error) {
+        this.outputChannel.appendLine(
+          `Failed to resolve ${host}: ${getErrorDescription(error)}`
+        );
+      }
     }
 
     // Build debug target path
     const targetBasePath = path.join(
       folder?.uri.fsPath || "",
-      ".wendy-build/debug"
+      ".build/aarch64-unknown-linux-gnu/debug"
     );
 
     // Check the format of the SDK bundle to ensure we're using the right paths
-    const sdkSubPath = "";
-    // TODO: Detect SDK structure dynamically, instead of assuming Swift 6.2.1 layout
-    const moduleSubPath =
-      "6.2.1-RELEASE_wendyos_aarch64/aarch64-unknown-linux-gnu/debian-bookworm.sdk/usr/lib/swift_static/linux";
+    // SDK structure: <bundle>.artifactbundle/<bundle>/aarch64-unknown-linux-gnu/debian-bookworm.sdk
+    const sdkSubPath = `${sdkBundle}.artifactbundle/${sdkBundle}/aarch64-unknown-linux-gnu/debian-bookworm.sdk`;
+    const moduleSubPath = `${sdkSubPath}/usr/lib/swift/linux`;
 
-    // Create shared SDK path commands for both debugger types
+    // Use lldb-dap from Swiftly installation (matches the Swift version used for cross-compilation)
+    const swiftlyLldbDap = path.join(os.homedir(), ".swiftly", "bin", "lldb-dap");
+
+    // SDK path commands for Swift expression evaluation
     const sdkPathCommands = [
       `settings set target.sdk-path "${path.join(sdkPath, sdkSubPath)}"`,
       `settings set target.swift-module-search-paths "${path.join(
@@ -360,21 +365,22 @@ export class WendyDebugConfigurationProvider
       )}"`,
     ];
 
+
     // Set up debug configuration based on debugger type
     if (DEBUGGER_TYPE === "lldb-dap") {
       // lldb-dap configuration
       debugConfiguration.type = "lldb-dap";
       debugConfiguration.request = "attach";
 
-      // Set the SDK path and module search paths in initCommands
+      // Use lldb-dap from Swiftly for cross-compilation support
+      debugConfiguration.debugAdapterExecutable = swiftlyLldbDap;
+      this.outputChannel.appendLine(`Using lldb-dap from Swiftly: ${swiftlyLldbDap}`);
+
+      // Set SDK path BEFORE target creation so SwiftASTContext picks it up
       debugConfiguration.initCommands = sdkPathCommands;
       debugConfiguration.attachCommands = [
-        // `gdb-remote ${remoteAddress}`,
-        "platform select remote-linux",
-        `platform connect connect://${remoteAddress}`,
         `target create ${targetBasePath}/${debugConfiguration.target}`,
-        `file /bin/${debugConfiguration.target.toLowerCase()}`,
-        "run",
+        `gdb-remote ${remoteAddress}`,
       ];
 
       // TODO: Don't hardcode this path - once the Wendy CLI is capable of managing the SDK,

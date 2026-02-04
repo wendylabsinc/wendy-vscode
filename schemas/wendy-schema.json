@@ -3,20 +3,24 @@
     "type": "object",
     "properties": {
         "appId": {
-            "type": "string"
+            "type": "string",
+            "description": "Unique identifier for the application"
         },
         "version": {
-            "type": "string"
+            "type": "string",
+            "description": "Version of the application"
         },
         "language": {
             "type": "string",
             "enum": [
                 "python",
                 "swift"
-            ]
+            ],
+            "description": "Programming language of the project"
         },
         "python": {
             "type": "object",
+            "description": "Python-specific configuration",
             "properties": {
                 "container": {
                     "type": "object",
@@ -31,6 +35,7 @@
         },
         "entitlements": {
             "type": "array",
+            "description": "List of entitlements required by the application",
             "items": {
                 "type": "object",
                 "properties": {
@@ -38,10 +43,13 @@
                         "type": "string",
                         "enum": [
                             "network",
-                            "video"
+                            "video",
+                            "audio",
+                            "bluetooth",
+                            "gpu",
+                            "persist"
                         ],
-                        "description": "The type of entitlement.",
-                        "$comment": "The `type` property is always required. It's added explicitly another time to help with autocompletion."
+                        "description": "The type of entitlement."
                     }
                 },
                 "required": [
@@ -58,9 +66,7 @@
                         "properties": {
                             "type": {
                                 "type": "string",
-                                "enum": [
-                                    "network"
-                                ]
+                                "const": "network"
                             },
                             "mode": {
                                 "type": "string",
@@ -68,7 +74,7 @@
                                     "host",
                                     "none"
                                 ],
-                                "description": "Network mode - 'host' allows network access, 'none' disables all network access"
+                                "description": "Network mode - 'host' allows full network access, 'none' disables all network access"
                             }
                         }
                     },
@@ -77,13 +83,73 @@
                         "required": [
                             "type"
                         ],
-                        "description": "Define access to camera devices.",
+                        "description": "Define access to camera/video devices.",
                         "properties": {
                             "type": {
                                 "type": "string",
-                                "enum": [
-                                    "video"
-                                ]
+                                "const": "video"
+                            }
+                        }
+                    },
+                    {
+                        "type": "object",
+                        "required": [
+                            "type"
+                        ],
+                        "description": "Define access to audio devices.",
+                        "properties": {
+                            "type": {
+                                "type": "string",
+                                "const": "audio"
+                            }
+                        }
+                    },
+                    {
+                        "type": "object",
+                        "required": [
+                            "type"
+                        ],
+                        "description": "Define access to Bluetooth devices.",
+                        "properties": {
+                            "type": {
+                                "type": "string",
+                                "const": "bluetooth"
+                            }
+                        }
+                    },
+                    {
+                        "type": "object",
+                        "required": [
+                            "type"
+                        ],
+                        "description": "Define access to GPU for hardware acceleration.",
+                        "properties": {
+                            "type": {
+                                "type": "string",
+                                "const": "gpu"
+                            }
+                        }
+                    },
+                    {
+                        "type": "object",
+                        "required": [
+                            "type",
+                            "name",
+                            "path"
+                        ],
+                        "description": "Define a persistent volume for data that survives app restarts.",
+                        "properties": {
+                            "type": {
+                                "type": "string",
+                                "const": "persist"
+                            },
+                            "name": {
+                                "type": "string",
+                                "description": "Name of the persistent volume"
+                            },
+                            "path": {
+                                "type": "string",
+                                "description": "Path inside the container where the volume is mounted"
                             }
                         }
                     }
@@ -95,5 +161,5 @@
         "appId",
         "version",
         "entitlements"
-    ],
+    ]
 }

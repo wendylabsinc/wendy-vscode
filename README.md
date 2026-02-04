@@ -48,14 +48,12 @@ The Wendy extension provides comprehensive integration with the Wendy platform, 
 
 1. Install the extension from the VS Code Marketplace
 2. Ensure the Wendy CLI is installed (`wendy --version` should work in your terminal)
-3. Configure the Swift SDK path if needed for debugging
 
 ## Extension Settings
 
 This extension contributes the following settings:
 
 * `wendyos.cliPath`: Path to the Wendy CLI executable. Leave empty for automatic detection.
-* `wendyos.swiftSdkPath`: Path to the WendyOS Swift SDK artifact bundle (required for debugging).
 * `wendyos.devices`: List of Wendy devices (managed by the extension).
 * `wendyos.currentDevice`: ID of the currently selected Wendy device (managed by the extension).
 
