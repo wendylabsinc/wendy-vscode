@@ -35,10 +35,27 @@ export interface LANDeviceApp {
   bundleIdentifier?: string;
 }
 
+export interface BluetoothDevice {
+    id: string;
+    displayName: string;
+    address: string;
+    rssi: number;
+    isWendyDevice: boolean;
+    agentVersion?: string;
+    os?: string;
+    osVersion?: string;
+    cpuArchitecture?: string;
+    featureset?: Set<string>;
+    l2capPSM?: number;
+}
+
 export interface DeviceList {
   lanDevices: LANDevice[];
   ethernetDevices: EthernetDevice[];
   usbDevices: USBDevice[];
+  bluetoothDevices: BluetoothDevice[];
+  dockerDesktop: boolean;
+  local: boolean;
 }
 
 export interface WifiNetwork {
@@ -148,6 +165,38 @@ export class DeviceManager {
           lanDevice.agentVersion,
           "LAN"
         ));
+      }
+
+      for(const btDevice of deviceList.bluetoothDevices) {
+        foundDevices.push(new Device(
+          btDevice.id,
+          btDevice.address,
+          btDevice.displayName,
+          btDevice.agentVersion,
+          "BLE"
+        ));
+      }
+
+      if(deviceList.dockerDesktop) {
+        const dockerDevice = new Device(
+          "docker-desktop",
+          "docker",
+          "Docker Desktop",
+          undefined,
+          "Docker"
+        );
+        foundDevices.push(dockerDevice);
+      }
+
+      if(deviceList.local) {
+        const localDevice = new Device(
+          "local",
+          "local",
+          "Local Machine",
+          undefined,
+          "Local"
+        );
+        foundDevices.push(localDevice);
       }
 
       const devices = [...foundDevices, ...manuallyAddedDevices];
