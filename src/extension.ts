@@ -43,6 +43,7 @@ export async function activate(
 
     // Create the DeviceManager
     const deviceManager = new DeviceManager();
+    context.subscriptions.push(deviceManager);
     const diskManager = new DiskManager(outputChannel);
     const projectManager = new ProjectManager(outputChannel);
 

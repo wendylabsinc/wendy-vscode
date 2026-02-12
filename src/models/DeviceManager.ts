@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { Device } from "./Device";
 import { v7 as uuidv7 } from "uuid";
-import { exec } from "child_process";
+import { exec, spawn, ChildProcess } from "child_process";
 import { WendyCLI } from "../wendy-cli/wendy-cli";
 
 export interface EthernetDevice {
@@ -97,7 +97,7 @@ export type HardwareCategory = 'gpu' | 'usb' | 'i2c' | 'spi' | 'gpio' | 'camera'
 /**
  * Manages devices stored in VS Code configuration
  */
-export class DeviceManager {
+export class DeviceManager implements vscode.Disposable {
   private static readonly CONFIG_KEY = "wendyos.devices";
   private static readonly CURRENT_DEVICE_KEY = "wendyos.currentDevice";
   private _onDevicesChanged = new vscode.EventEmitter<void>();
@@ -105,6 +105,9 @@ export class DeviceManager {
   private deviceIdsCheckedForUpdates: Set<string> = new Set();
   private currentDevice: Device | undefined;
   private lanDeviceDetails: Map<string, LANDevice> = new Map();
+  private discoverProcess: ChildProcess | undefined;
+  private stdoutBuffer: string = "";
+  private disposed: boolean = false;
   readonly onDevicesChanged = this._onDevicesChanged.event;
 
   private _onCurrentDeviceChanged = new vscode.EventEmitter<
@@ -112,110 +115,138 @@ export class DeviceManager {
   >();
   readonly onCurrentDeviceChanged = this._onCurrentDeviceChanged.event;
 
-  constructor() { }
+  constructor() {
+    this.devices = this.getManualDevices();
+  }
 
-  /**
-   * Get all configured devices
-   */
-  async getDevices(): Promise<Device[]> {
+  private getManualDevices(): Device[] {
     const config = vscode.workspace.getConfiguration();
-    let devices =
+    const devices =
       config.get<Array<{ id: string; address: string }>>(
         DeviceManager.CONFIG_KEY
       ) || [];
-
-    const manuallyAddedDevices = devices.map((d) => new Device(
+    return devices.map((d) => new Device(
       d.id,
       d.address,
       d.address,
       undefined,
       "Custom"
     ));
+  }
 
-    try {
-      const cli = await WendyCLI.create();
-      if (!cli) {
-        return manuallyAddedDevices;
-      }
+  /**
+   * Start streaming device discovery using `wendy discover --json --stream`.
+   * Parses each JSONL line and fires change events reactively.
+   */
+  async startDiscovery(): Promise<void> {
+    this.stopDiscovery();
 
-      // Execute the wendy discover command with a single --json output flag
-      const output = await new Promise<string>((resolve, reject) => {
-        exec(`${cli.path} discover --json`, (error, stdout) => {
-          if (error) {
-            reject(error);
-          }
-          resolve(stdout);
-        });
-      });
-
-      // Parse the JSON output
-      const deviceList: DeviceList = JSON.parse(output);
-      const nextLanDeviceDetails = new Map<string, LANDevice>();
-
-      let foundDevices: Device[] = [];
-
-      // TODO: Add ethernet and usb devices
-
-      for (const lanDevice of deviceList.lanDevices) {
-        nextLanDeviceDetails.set(lanDevice.id, lanDevice);
-        foundDevices.push(new Device(
-          lanDevice.id,
-          lanDevice.hostname,
-          lanDevice.displayName,
-          lanDevice.agentVersion,
-          "LAN"
-        ));
-      }
-
-      for(const btDevice of deviceList.bluetoothDevices) {
-        foundDevices.push(new Device(
-          btDevice.id,
-          btDevice.address,
-          btDevice.displayName,
-          btDevice.agentVersion,
-          "BLE"
-        ));
-      }
-
-      if(deviceList.dockerDesktop) {
-        const dockerDevice = new Device(
-          "docker-desktop",
-          "docker",
-          "Docker Desktop",
-          undefined,
-          "Docker"
-        );
-        foundDevices.push(dockerDevice);
-      }
-
-      if(deviceList.local) {
-        const localDevice = new Device(
-          "local",
-          "local",
-          "Local Machine",
-          undefined,
-          "Local"
-        );
-        foundDevices.push(localDevice);
-      }
-
-      const devices = [...foundDevices, ...manuallyAddedDevices];
-      this.lanDeviceDetails = nextLanDeviceDetails;
-      this.devices = devices;
-      const currentDevice = this.getCurrentDevice();
-      if (currentDevice) {
-        this.checkForUpdates(currentDevice);
-      }
-      return devices;
-    } catch (error) {
-      console.error(error);
-      this.devices = manuallyAddedDevices;
-      const currentDevice = this.getCurrentDevice();
-      if (currentDevice) {
-        this.checkForUpdates(currentDevice);
-      }
-      return manuallyAddedDevices;
+    const cli = await WendyCLI.create();
+    if (!cli) {
+      return;
     }
+
+    const proc = spawn(cli.path, ['discover', '--json', '--stream']);
+    this.discoverProcess = proc;
+
+    proc.stdout?.on('data', (data: Buffer) => {
+      this.stdoutBuffer += data.toString();
+      const lines = this.stdoutBuffer.split('\n');
+      this.stdoutBuffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (line.trim()) {
+          try {
+            const deviceList: DeviceList = JSON.parse(line);
+            this.processDeviceList(deviceList);
+          } catch (e) {
+            console.error('Failed to parse device discovery output:', e);
+          }
+        }
+      }
+    });
+
+    proc.stderr?.on('data', (data: Buffer) => {
+      console.error('Device discovery stderr:', data.toString());
+    });
+
+    proc.on('close', () => {
+      this.discoverProcess = undefined;
+      if (!this.disposed) {
+        setTimeout(() => this.startDiscovery(), 5000);
+      }
+    });
+  }
+
+  private processDeviceList(deviceList: DeviceList): void {
+    const manualDevices = this.getManualDevices();
+    const nextLanDeviceDetails = new Map<string, LANDevice>();
+    let foundDevices: Device[] = [];
+
+    for (const lanDevice of deviceList.lanDevices) {
+      nextLanDeviceDetails.set(lanDevice.id, lanDevice);
+      foundDevices.push(new Device(
+        lanDevice.id,
+        lanDevice.hostname,
+        lanDevice.displayName,
+        lanDevice.agentVersion,
+        "LAN"
+      ));
+    }
+
+    for (const btDevice of deviceList.bluetoothDevices) {
+      foundDevices.push(new Device(
+        btDevice.id,
+        btDevice.address,
+        btDevice.displayName,
+        btDevice.agentVersion,
+        "BLE"
+      ));
+    }
+
+    if (deviceList.dockerDesktop) {
+      foundDevices.push(new Device(
+        "docker-desktop",
+        "docker",
+        "Docker Desktop",
+        undefined,
+        "Docker"
+      ));
+    }
+
+    if (deviceList.local) {
+      foundDevices.push(new Device(
+        "local",
+        "local",
+        "Local Machine",
+        undefined,
+        "Local"
+      ));
+    }
+
+    const devices = [...foundDevices, ...manualDevices];
+    this.lanDeviceDetails = nextLanDeviceDetails;
+    this.devices = devices;
+    const currentDevice = this.getCurrentDevice();
+    if (currentDevice) {
+      this.checkForUpdates(currentDevice);
+    }
+    this._onDevicesChanged.fire();
+  }
+
+  stopDiscovery(): void {
+    if (this.discoverProcess) {
+      this.discoverProcess.kill();
+      this.discoverProcess = undefined;
+    }
+    this.stdoutBuffer = "";
+  }
+
+  /**
+   * Get all configured devices (returns cached results from streaming discovery)
+   */
+  getDevices(): Device[] {
+    return this.devices;
   }
 
   getLanDeviceDetails(deviceId: string): LANDevice | undefined {
@@ -699,5 +730,10 @@ export class DeviceManager {
       }
       return [];
     }
+  }
+
+  dispose(): void {
+    this.disposed = true;
+    this.stopDiscovery();
   }
 }
