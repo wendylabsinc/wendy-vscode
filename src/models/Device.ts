@@ -26,6 +26,6 @@ export class Device {
     /**
      * Interface type of the device
      */
-    public readonly connectionType: "Ethernet" | "USB" | "LAN" | "BLE" | "Docker" | "Local" | "Custom"
+    public readonly connectionType: "Ethernet" | "USB" | "LAN" | "BLE" | "Docker" | "Local" | "External" | "Custom"
   ) {}
 }

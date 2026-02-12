@@ -49,11 +49,22 @@ export interface BluetoothDevice {
     l2capPSM?: number;
 }
 
+export interface ExternalDevice {
+  id: string;
+  displayName: string;
+  os?: string;
+  cpuArchitecture?: string;
+  isWendyDevice?: boolean;
+  providerKey?: string;
+  connectionInfo?: Record<string, string>;
+}
+
 export interface DeviceList {
   lanDevices: LANDevice[];
   ethernetDevices: EthernetDevice[];
   usbDevices: USBDevice[];
   bluetoothDevices: BluetoothDevice[];
+  externalDevices?: ExternalDevice[];
   dockerDesktop: boolean;
   local: boolean;
 }
@@ -221,6 +232,16 @@ export class DeviceManager implements vscode.Disposable {
         "Local Machine",
         undefined,
         "Local"
+      ));
+    }
+
+    for (const externalDevice of deviceList.externalDevices || []) {
+      foundDevices.push(new Device(
+        externalDevice.id,
+        externalDevice.id,
+        externalDevice.displayName,
+        undefined,
+        "External"
       ));
     }
 
