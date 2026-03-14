@@ -637,6 +637,40 @@ export async function activate(
         }
       ),
 
+      // Show logs for a specific app
+      vscode.commands.registerCommand(
+        "wendyApps.showLogs",
+        async (item: AppTreeItem) => {
+          if (!item) {
+            return;
+          }
+
+          const cli = await WendyCLI.create();
+          if (!cli) {
+            vscode.window.showErrorMessage("Wendy CLI not found");
+            return;
+          }
+
+          // Ask for log level
+          const levelChoice = await vscode.window.showQuickPick(
+            ['trace', 'debug', 'info', 'warn', 'error', 'fatal'].map(l => ({ label: l, value: l })),
+            { placeHolder: "Minimum log level (optional)" }
+          );
+
+          const terminal = vscode.window.createTerminal({
+            name: `Logs: ${item.app.name}`,
+            shellPath: cli.path,
+            shellArgs: [
+              'device', 'logs',
+              '--device', item.deviceAddress,
+              '--app', item.app.name,
+              ...(levelChoice ? ['--level', levelChoice.value] : [])
+            ]
+          });
+          terminal.show();
+        }
+      ),
+
       // Show dashboard command
       vscode.commands.registerCommand(
         "wendyDevices.showDashboard",

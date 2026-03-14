@@ -168,6 +168,11 @@
         "category": "Wendy"
       },
       {
+        "command": "wendyApps.showLogs",
+        "title": "Show Logs",
+        "category": "Wendy"
+      },
+      {
         "command": "wendyApps.startApp",
         "title": "Start App",
         "icon": "$(play)"
@@ -345,6 +350,11 @@
           "command": "wendyDevices.deviceSetup",
           "when": "view == wendyDevices && viewItem =~ /device/",
           "group": "device@1"
+        },
+        {
+          "command": "wendyApps.showLogs",
+          "when": "view == wendyDevices && viewItem == app-running",
+          "group": "observability@0"
         },
         {
           "command": "wendyApps.startApp",
