@@ -96,6 +96,20 @@ export class WendyTaskProvider implements vscode.TaskProvider {
         for (const product of executableProducts) {
           tasks.push(...this.createSwiftRunTasks(product, folderContext));
         }
+
+        // Also include dynamic library products
+        const allProducts = await (folderContext.swift.swiftPackage as any).products as
+          | Swift.Product[]
+          | undefined;
+
+        if (allProducts) {
+          const dynamicLibProducts = allProducts.filter(
+            p => p.type.library && p.type.library.includes("dynamic")
+          );
+          for (const product of dynamicLibProducts) {
+            tasks.push(...this.createSwiftRunTasks(product, folderContext));
+          }
+        }
       } else if (this.hasPythonExtension) {
         tasks.push(...this.createPythonRunTask(folderContext));
       }

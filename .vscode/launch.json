@@ -6,6 +6,14 @@
 	"version": "0.2.0",
 	"configurations": [
 		{
+			"type": "wendy",
+			"name": "Debug Python App with Wendy",
+			"request": "attach",
+			"target": "/Users/joannisorlandos/git/wendy/edge-vscode",
+			"cwd": "/Users/joannisorlandos/git/wendy/edge-vscode",
+			"preLaunchTask": "wendy: Run Python App"
+		},
+		{
 			"name": "Run Extension",
 			"type": "extensionHost",
 			"request": "launch",

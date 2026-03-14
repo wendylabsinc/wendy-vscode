@@ -43,6 +43,7 @@ export async function activate(
 
     // Create the DeviceManager
     const deviceManager = new DeviceManager();
+    context.subscriptions.push(deviceManager);
     const diskManager = new DiskManager(outputChannel);
     const projectManager = new ProjectManager(outputChannel);
 
@@ -425,7 +426,7 @@ export async function activate(
     // Register device-related commands
     context.subscriptions.push(
       vscode.commands.registerCommand("wendyDevices.refreshDevices", () => {
-        devicesProvider.refresh();
+        devicesProvider.autorefresh();
       }),
 
       vscode.commands.registerCommand("wendyDevices.addDevice", async () => {

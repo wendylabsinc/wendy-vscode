@@ -35,10 +35,37 @@ export interface LANDeviceApp {
   bundleIdentifier?: string;
 }
 
+export interface BluetoothDevice {
+    id: string;
+    displayName: string;
+    address: string;
+    rssi: number;
+    isWendyDevice: boolean;
+    agentVersion?: string;
+    os?: string;
+    osVersion?: string;
+    cpuArchitecture?: string;
+    featureset?: Set<string>;
+    l2capPSM?: number;
+}
+
+export interface ExternalDevice {
+  id: string;
+  displayName: string;
+  os?: string;
+  cpuArchitecture?: string;
+  isWendyDevice?: boolean;
+  agentVersion?: string;
+  providerKey?: string;
+  connectionInfo?: Record<string, string>;
+}
+
 export interface DeviceList {
-  lanDevices: LANDevice[];
-  ethernetDevices: EthernetDevice[];
-  usbDevices: USBDevice[];
+  lanDevices: LANDevice[] | null;
+  ethernetDevices: EthernetDevice[] | null;
+  usbDevices: USBDevice[] | null;
+  bluetoothDevices: BluetoothDevice[] | null;
+  externalDevices: ExternalDevice[] | null;
 }
 
 export interface WifiNetwork {
@@ -80,7 +107,7 @@ export type HardwareCategory = 'gpu' | 'usb' | 'i2c' | 'spi' | 'gpio' | 'camera'
 /**
  * Manages devices stored in VS Code configuration
  */
-export class DeviceManager {
+export class DeviceManager implements vscode.Disposable {
   private static readonly CONFIG_KEY = "wendyos.devices";
   private static readonly CURRENT_DEVICE_KEY = "wendyos.currentDevice";
   private _onDevicesChanged = new vscode.EventEmitter<void>();
@@ -88,6 +115,8 @@ export class DeviceManager {
   private deviceIdsCheckedForUpdates: Set<string> = new Set();
   private currentDevice: Device | undefined;
   private lanDeviceDetails: Map<string, LANDevice> = new Map();
+  private discoveryTimer: ReturnType<typeof setTimeout> | undefined;
+  private disposed: boolean = false;
   readonly onDevicesChanged = this._onDevicesChanged.event;
 
   private _onCurrentDeviceChanged = new vscode.EventEmitter<
@@ -95,78 +124,124 @@ export class DeviceManager {
   >();
   readonly onCurrentDeviceChanged = this._onCurrentDeviceChanged.event;
 
-  constructor() { }
+  constructor() {
+    this.devices = this.getManualDevices();
+  }
 
-  /**
-   * Get all configured devices
-   */
-  async getDevices(): Promise<Device[]> {
+  private getManualDevices(): Device[] {
     const config = vscode.workspace.getConfiguration();
-    let devices =
+    const devices =
       config.get<Array<{ id: string; address: string }>>(
         DeviceManager.CONFIG_KEY
       ) || [];
-
-    const manuallyAddedDevices = devices.map((d) => new Device(
+    return devices.map((d) => new Device(
       d.id,
       d.address,
       d.address,
       undefined,
       "Custom"
     ));
+  }
 
-    try {
-      const cli = await WendyCLI.create();
-      if (!cli) {
-        return manuallyAddedDevices;
-      }
+  /**
+   * Start periodic device discovery using `wendy discover --json`.
+   * Runs a discovery scan, processes results, then schedules the next scan.
+   */
+  async startDiscovery(): Promise<void> {
+    this.stopDiscovery();
 
-      // Execute the wendy discover command with a single --json output flag
-      const output = await new Promise<string>((resolve, reject) => {
-        exec(`${cli.path} discover --json`, (error, stdout) => {
-          if (error) {
-            reject(error);
-          }
-          resolve(stdout);
-        });
-      });
-
-      // Parse the JSON output
-      const deviceList: DeviceList = JSON.parse(output);
-      const nextLanDeviceDetails = new Map<string, LANDevice>();
-
-      let foundDevices: Device[] = [];
-
-      // TODO: Add ethernet and usb devices
-
-      for (const lanDevice of deviceList.lanDevices) {
-        nextLanDeviceDetails.set(lanDevice.id, lanDevice);
-        foundDevices.push(new Device(
-          lanDevice.id,
-          lanDevice.hostname,
-          lanDevice.displayName,
-          lanDevice.agentVersion,
-          "LAN"
-        ));
-      }
-
-      const devices = [...foundDevices, ...manuallyAddedDevices];
-      this.lanDeviceDetails = nextLanDeviceDetails;
-      this.devices = devices;
-      const currentDevice = this.getCurrentDevice();
-      if (currentDevice) {
-        this.checkForUpdates(currentDevice);
-      }
-      return devices;
-    } catch (error) {
-      console.error(error);
-      this.devices = manuallyAddedDevices;
-      const currentDevice = this.getCurrentDevice();
-      if (currentDevice) {
-        this.checkForUpdates(currentDevice);
-      }
-      return manuallyAddedDevices;
+    const cli = await WendyCLI.create();
+    if (!cli) {
+      return;
     }
+
+    exec(`${cli.path} discover --json`, (error, stdout, stderr) => {
+      if (stderr) {
+        console.error('Device discovery stderr:', stderr);
+      }
+
+      if (!error && stdout.trim()) {
+        try {
+          const deviceList: DeviceList = JSON.parse(stdout);
+          this.processDeviceList(deviceList);
+        } catch (e) {
+          console.error('Failed to parse device discovery output:', e);
+        }
+      }
+
+      if (!this.disposed) {
+        this.discoveryTimer = setTimeout(() => this.startDiscovery(), 5000);
+      }
+    });
+  }
+
+  private processDeviceList(deviceList: DeviceList): void {
+    const manualDevices = this.getManualDevices();
+    const nextLanDeviceDetails = new Map<string, LANDevice>();
+    let foundDevices: Device[] = [];
+
+    for (const lanDevice of deviceList.lanDevices || []) {
+      nextLanDeviceDetails.set(lanDevice.id, lanDevice);
+      foundDevices.push(new Device(
+        lanDevice.id,
+        lanDevice.hostname,
+        lanDevice.displayName,
+        lanDevice.agentVersion,
+        "LAN"
+      ));
+    }
+
+    for (const btDevice of deviceList.bluetoothDevices || []) {
+      foundDevices.push(new Device(
+        btDevice.id,
+        btDevice.address,
+        btDevice.displayName,
+        btDevice.agentVersion,
+        "BLE"
+      ));
+    }
+
+    for (const externalDevice of deviceList.externalDevices || []) {
+      const connectionType = this.connectionTypeForExternalDevice(externalDevice);
+      foundDevices.push(new Device(
+        externalDevice.id,
+        externalDevice.id,
+        externalDevice.displayName,
+        externalDevice.agentVersion,
+        connectionType
+      ));
+    }
+
+    const devices = [...foundDevices, ...manualDevices];
+    this.lanDeviceDetails = nextLanDeviceDetails;
+    this.devices = devices;
+    const currentDevice = this.getCurrentDevice();
+    if (currentDevice) {
+      this.checkForUpdates(currentDevice);
+    }
+    this._onDevicesChanged.fire();
+  }
+
+  private connectionTypeForExternalDevice(device: ExternalDevice): Device["connectionType"] {
+    switch (device.providerKey) {
+      case "local": return "Local";
+      case "docker": return "Docker";
+      default: return "External";
+    }
+  }
+
+  stopDiscovery(): void {
+    if (this.discoveryTimer) {
+      clearTimeout(this.discoveryTimer);
+      this.discoveryTimer = undefined;
+    }
+  }
+
+  /**
+   * Get all configured devices (returns cached results from streaming discovery)
+   */
+  getDevices(): Device[] {
+    return this.devices;
   }
 
   getLanDeviceDetails(deviceId: string): LANDevice | undefined {
@@ -650,5 +725,10 @@ export class DeviceManager {
       }
       return [];
     }
+  }
+
+  dispose(): void {
+    this.disposed = true;
+    this.stopDiscovery();
   }
 }
