@@ -7,7 +7,7 @@
 	"configurations": [
 		{
 			"type": "wendy",
-			"name": "Debug Python App with Wendy",
+			"name": "Debug Python App on WendyOS",
 			"request": "attach",
 			"target": "/Users/joannisorlandos/git/wendy/edge-vscode",
 			"cwd": "/Users/joannisorlandos/git/wendy/edge-vscode",

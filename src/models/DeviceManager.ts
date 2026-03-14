@@ -382,7 +382,7 @@ export class DeviceManager implements vscode.Disposable {
     }, async () => {
       try {
         await new Promise<string>((resolve, reject) => {
-          exec(`${cli.path} agent update --device ${device.address}`, (error, stdout) => {
+          exec(`${cli.path} device update --device ${device.address}`, (error, stdout) => {
             if (error) {
               reject(error);
             }
