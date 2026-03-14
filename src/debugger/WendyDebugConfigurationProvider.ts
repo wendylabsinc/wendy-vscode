@@ -105,7 +105,7 @@ export class WendyDebugConfigurationProvider
     return [
       {
         type: WENDY_LAUNCH_CONFIG_TYPE,
-        name: "Debug Python App on WendyOS",
+        name: "Debug Python App with Wendy",
         request: "attach",
         target: "Python App",
         cwd: folder?.uri.path,
@@ -120,7 +120,7 @@ export class WendyDebugConfigurationProvider
   ): Promise<vscode.DebugConfiguration[]> {
     const configs: vscode.DebugConfiguration[] = [];
 
-    // Generate a debug configuration for each Swift executable target
+    // Generate a debug configuration for each Swift executable and dynamic library target
     for (const folderContext of this.workspaceContext.folders) {
       if (!folderContext.swift) {
         continue;
@@ -132,12 +132,34 @@ export class WendyDebugConfigurationProvider
       for (const product of executableProducts) {
         configs.push({
           type: WENDY_LAUNCH_CONFIG_TYPE,
-          name: `Debug ${product.name} on WendyOS`,
+          name: `Debug ${product.name} with Wendy`,
           request: "attach",
           target: product.name,
           cwd: folderContext.swift.folder.fsPath,
           preLaunchTask: `wendy: Run ${product.name}`,
         });
+      }
+
+      // Also include dynamic library products
+      const allProducts = await (folderContext.swift.swiftPackage as any).products as
+        | { name: string; targets: string[]; type: { executable?: null; library?: string[] } }[]
+        | undefined;
+
+      if (allProducts) {
+        const dynamicLibProducts = allProducts.filter(
+          p => p.type.library && p.type.library.includes("dynamic")
+        );
+
+        for (const product of dynamicLibProducts) {
+          configs.push({
+            type: WENDY_LAUNCH_CONFIG_TYPE,
+            name: `Debug ${product.name} with Wendy`,
+            request: "attach",
+            target: product.name,
+            cwd: folderContext.swift.folder.fsPath,
+            preLaunchTask: `wendy: Run ${product.name}`,
+          });
+        }
       }
     }
 
@@ -174,7 +196,7 @@ export class WendyDebugConfigurationProvider
     if (!currentDevice) {
       const actions = ["Add Device", "Select Device", "Cancel"];
       const selection = await vscode.window.showErrorMessage(
-        "No WendyOS device is selected. You must select a device before debugging.",
+        "No Wendy device is selected. You must select a device before debugging.",
         ...actions
       );
 

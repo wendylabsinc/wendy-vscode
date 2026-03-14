@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { Device } from "./Device";
 import { v7 as uuidv7 } from "uuid";
-import { exec, spawn, ChildProcess } from "child_process";
+import { exec } from "child_process";
 import { WendyCLI } from "../wendy-cli/wendy-cli";
 
 export interface EthernetDevice {
@@ -55,18 +55,17 @@ export interface ExternalDevice {
   os?: string;
   cpuArchitecture?: string;
   isWendyDevice?: boolean;
+  agentVersion?: string;
   providerKey?: string;
   connectionInfo?: Record<string, string>;
 }
 
 export interface DeviceList {
-  lanDevices: LANDevice[];
-  ethernetDevices: EthernetDevice[];
-  usbDevices: USBDevice[];
-  bluetoothDevices: BluetoothDevice[];
-  externalDevices?: ExternalDevice[];
-  dockerDesktop: boolean;
-  local: boolean;
+  lanDevices: LANDevice[] | null;
+  ethernetDevices: EthernetDevice[] | null;
+  usbDevices: USBDevice[] | null;
+  bluetoothDevices: BluetoothDevice[] | null;
+  externalDevices: ExternalDevice[] | null;
 }
 
 export interface WifiNetwork {
@@ -116,8 +115,7 @@ export class DeviceManager implements vscode.Disposable {
   private deviceIdsCheckedForUpdates: Set<string> = new Set();
   private currentDevice: Device | undefined;
   private lanDeviceDetails: Map<string, LANDevice> = new Map();
-  private discoverProcess: ChildProcess | undefined;
-  private stdoutBuffer: string = "";
+  private discoveryTimer: ReturnType<typeof setTimeout> | undefined;
   private disposed: boolean = false;
   readonly onDevicesChanged = this._onDevicesChanged.event;
 
@@ -146,8 +144,8 @@ export class DeviceManager implements vscode.Disposable {
   }
 
   /**
-   * Start streaming device discovery using `wendy discover --json --stream`.
-   * Parses each JSONL line and fires change events reactively.
+   * Start periodic device discovery using `wendy discover --json`.
+   * Runs a discovery scan, processes results, then schedules the next scan.
    */
   async startDiscovery(): Promise<void> {
     this.stopDiscovery();
@@ -157,34 +155,22 @@ export class DeviceManager implements vscode.Disposable {
       return;
     }
 
-    const proc = spawn(cli.path, ['discover', '--json', '--stream']);
-    this.discoverProcess = proc;
+    exec(`${cli.path} discover --json`, (error, stdout, stderr) => {
+      if (stderr) {
+        console.error('Device discovery stderr:', stderr);
+      }
 
-    proc.stdout?.on('data', (data: Buffer) => {
-      this.stdoutBuffer += data.toString();
-      const lines = this.stdoutBuffer.split('\n');
-      this.stdoutBuffer = lines.pop() || '';
-
-      for (const line of lines) {
-        if (line.trim()) {
-          try {
-            const deviceList: DeviceList = JSON.parse(line);
-            this.processDeviceList(deviceList);
-          } catch (e) {
-            console.error('Failed to parse device discovery output:', e);
-          }
+      if (!error && stdout.trim()) {
+        try {
+          const deviceList: DeviceList = JSON.parse(stdout);
+          this.processDeviceList(deviceList);
+        } catch (e) {
+          console.error('Failed to parse device discovery output:', e);
         }
       }
-    });
 
-    proc.stderr?.on('data', (data: Buffer) => {
-      console.error('Device discovery stderr:', data.toString());
-    });
-
-    proc.on('close', () => {
-      this.discoverProcess = undefined;
       if (!this.disposed) {
-        setTimeout(() => this.startDiscovery(), 5000);
+        this.discoveryTimer = setTimeout(() => this.startDiscovery(), 5000);
       }
     });
   }
@@ -194,7 +180,7 @@ export class DeviceManager implements vscode.Disposable {
     const nextLanDeviceDetails = new Map<string, LANDevice>();
     let foundDevices: Device[] = [];
 
-    for (const lanDevice of deviceList.lanDevices) {
+    for (const lanDevice of deviceList.lanDevices || []) {
       nextLanDeviceDetails.set(lanDevice.id, lanDevice);
       foundDevices.push(new Device(
         lanDevice.id,
@@ -205,7 +191,7 @@ export class DeviceManager implements vscode.Disposable {
       ));
     }
 
-    for (const btDevice of deviceList.bluetoothDevices) {
+    for (const btDevice of deviceList.bluetoothDevices || []) {
       foundDevices.push(new Device(
         btDevice.id,
         btDevice.address,
@@ -215,33 +201,14 @@ export class DeviceManager implements vscode.Disposable {
       ));
     }
 
-    if (deviceList.dockerDesktop) {
-      foundDevices.push(new Device(
-        "docker-desktop",
-        "docker",
-        "Docker Desktop",
-        undefined,
-        "Docker"
-      ));
-    }
-
-    if (deviceList.local) {
-      foundDevices.push(new Device(
-        "local",
-        "local",
-        "Local Machine",
-        undefined,
-        "Local"
-      ));
-    }
-
     for (const externalDevice of deviceList.externalDevices || []) {
+      const connectionType = this.connectionTypeForExternalDevice(externalDevice);
       foundDevices.push(new Device(
         externalDevice.id,
         externalDevice.id,
         externalDevice.displayName,
-        undefined,
-        "External"
+        externalDevice.agentVersion,
+        connectionType
       ));
     }
 
@@ -255,12 +222,19 @@ export class DeviceManager implements vscode.Disposable {
     this._onDevicesChanged.fire();
   }
 
-  stopDiscovery(): void {
-    if (this.discoverProcess) {
-      this.discoverProcess.kill();
-      this.discoverProcess = undefined;
+  private connectionTypeForExternalDevice(device: ExternalDevice): Device["connectionType"] {
+    switch (device.providerKey) {
+      case "local": return "Local";
+      case "docker": return "Docker";
+      default: return "External";
     }
-    this.stdoutBuffer = "";
+  }
+
+  stopDiscovery(): void {
+    if (this.discoveryTimer) {
+      clearTimeout(this.discoveryTimer);
+      this.discoveryTimer = undefined;
+    }
   }
 
   /**
