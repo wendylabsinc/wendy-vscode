@@ -323,12 +323,12 @@
         },
         {
           "command": "wendyDevices.wifiStatus",
-          "when": "view == wendyDevices && viewItem =~ /device/",
+          "when": "view == wendyDevices && viewItem =~ /device/ && viewItem =~ /LAN/",
           "group": "wifi@0"
         },
         {
           "command": "wendyDevices.disconnectWifi",
-          "when": "view == wendyDevices && viewItem =~ /device/",
+          "when": "view == wendyDevices && viewItem =~ /device/ && viewItem =~ /LAN/",
           "group": "wifi@1"
         },
         {
@@ -343,12 +343,12 @@
         },
         {
           "command": "wendyDevices.showHardware",
-          "when": "view == wendyDevices && viewItem =~ /device/",
+          "when": "view == wendyDevices && viewItem =~ /device/ && viewItem =~ /LAN/",
           "group": "device@0"
         },
         {
           "command": "wendyDevices.deviceSetup",
-          "when": "view == wendyDevices && viewItem =~ /device/",
+          "when": "view == wendyDevices && viewItem =~ /device/ && viewItem =~ /LAN/",
           "group": "device@1"
         },
         {

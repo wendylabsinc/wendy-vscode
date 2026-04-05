@@ -216,7 +216,9 @@ export class DeviceManager implements vscode.Disposable {
     this.devices = devices;
     const currentDevice = this.getCurrentDevice();
     if (currentDevice) {
-      this.checkForUpdates(currentDevice);
+      this.checkForUpdates(currentDevice).catch((error) => {
+        console.error('Failed to check for updates:', error);
+      });
     }
     this._onDevicesChanged.fire();
   }
@@ -315,7 +317,9 @@ export class DeviceManager implements vscode.Disposable {
         throw new Error(`Device with ID ${deviceId} not found`);
       }
       this.currentDevice = device;
-      this.checkForUpdates(device);
+      this.checkForUpdates(device).catch((error) => {
+        console.error('Failed to check for updates:', error);
+      });
     }
 
     await config.update(
