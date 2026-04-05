@@ -52,14 +52,14 @@ export class HardwareDeviceTreeItem extends vscode.TreeItem {
   constructor(
     public readonly hardware: HardwareDevice
   ) {
-    super(hardware.description || hardware.name, vscode.TreeItemCollapsibleState.None);
+    super(hardware.description || hardware.devicePath || '', vscode.TreeItemCollapsibleState.None);
     this.contextValue = "hardwareDevice";
     this.description = hardware.devicePath;
     this.tooltip = this.formatTooltip();
   }
 
   private formatTooltip(): string {
-    const lines = [this.hardware.description || this.hardware.name];
+    const lines = [this.hardware.description || this.hardware.devicePath || ''];
     if (this.hardware.devicePath) {
       lines.push(`Path: ${this.hardware.devicePath}`);
     }

@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { Device } from "./Device";
 import { v7 as uuidv7 } from "uuid";
-import { exec } from "child_process";
+import { exec, execFile } from "child_process";
 import { WendyCLI } from "../wendy-cli/wendy-cli";
 
 export interface EthernetDevice {
@@ -95,7 +95,6 @@ export interface DeviceApp {
 }
 
 export interface HardwareDevice {
-  name: string;
   category: string;
   description?: string;
   devicePath?: string;
@@ -674,13 +673,13 @@ export class DeviceManager implements vscode.Disposable {
       throw new Error("Failed to create Wendy CLI");
     }
 
-    let args = `--json device hardware --device ${deviceAddress}`;
+    const cliArgs = ['--json', 'hardware', 'list', '--device', deviceAddress];
     if (category) {
-      args += ` --category ${category}`;
+      cliArgs.push('--category', category);
     }
 
     const output = await new Promise<string>((resolve, reject) => {
-      exec(`${cli.path} ${args}`, (error, stdout, stderr) => {
+      execFile(cli.path, cliArgs, (error, stdout, stderr) => {
         if (error) {
           reject(new Error(stderr || error.message));
           return;
@@ -690,39 +689,17 @@ export class DeviceManager implements vscode.Disposable {
     });
 
     try {
-      // The CLI outputs multiple JSON objects (events first, then data)
-      // Find the array in the output
-      const lines = output.trim().split('\n');
-      for (const line of lines) {
-        try {
-          const parsed = JSON.parse(line);
-          if (Array.isArray(parsed)) {
-            return parsed;
-          }
-        } catch {
-          // Continue to next line
-        }
+      const result = JSON.parse(output.trim());
+      if (!Array.isArray(result)) {
+        return [];
       }
-
-      // Try parsing entire output as JSON
-      const result = JSON.parse(output);
-      if (Array.isArray(result)) {
-        return result;
-      }
-      if (result.hardware && Array.isArray(result.hardware)) {
-        return result.hardware;
-      }
-      return [];
+      return result.map((raw: Record<string, string>) => ({
+        category: raw.category,
+        description: raw.description,
+        devicePath: raw.device_path,
+        properties: raw.properties as unknown as Record<string, string> | undefined,
+      }));
     } catch {
-      // Try to find array in concatenated JSON output
-      const arrayMatch = output.match(/\[[\s\S]*\]/);
-      if (arrayMatch) {
-        try {
-          return JSON.parse(arrayMatch[0]);
-        } catch {
-          return [];
-        }
-      }
       return [];
     }
   }
