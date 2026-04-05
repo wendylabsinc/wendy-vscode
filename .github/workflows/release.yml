@@ -142,4 +142,39 @@ jobs:
           echo "Published to:"
           echo "  - VS Code Marketplace: https://marketplace.visualstudio.com/items?itemName=wendylabsinc.wendy-vscode"
           echo "  - Open VSX Registry: https://open-vsx.org/extension/wendylabsinc/wendy-vscode"
-          echo "======================================================" 
+          echo "======================================================"
+
+      - name: Notify Discord
+        if: ${{ !inputs.dry_run }}
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_RELEASE_WEBHOOK_URL }}
+        run: |
+          VERSION="${{ env.NEW_VERSION }}"
+          MARKETPLACE_URL="https://marketplace.visualstudio.com/items?itemName=wendylabsinc.wendy-vscode"
+          OPENVSX_URL="https://open-vsx.org/extension/wendylabsinc/wendy-vscode"
+
+          DESCRIPTION="Install from the [VS Code Marketplace](${MARKETPLACE_URL}) or [Open VSX Registry](${OPENVSX_URL})."
+          ESCAPED_DESC=$(echo "$DESCRIPTION" | jq -Rs .)
+
+          cat > /tmp/discord_payload.json << PAYLOAD_EOF
+          {
+            "content": "🧩 **New VS Code extension release**: **v${VERSION}**",
+            "embeds": [
+              {
+                "title": "Wendy VS Code Extension v${VERSION}",
+                "url": "${MARKETPLACE_URL}",
+                "description": ${ESCAPED_DESC},
+                "color": 5814783,
+                "footer": { "text": "wendylabsinc/wendy-vscode • v${VERSION}" }
+              }
+            ]
+          }
+          PAYLOAD_EOF
+
+          if [ -n "$DISCORD_WEBHOOK_URL" ]; then
+            curl -sS -X POST -H "Content-Type: application/json" \
+              -d @/tmp/discord_payload.json \
+              "$DISCORD_WEBHOOK_URL" && echo "Discord notification sent" || echo "Discord notification failed"
+          else
+            echo "DISCORD_WEBHOOK_URL not configured, skipping notification"
+          fi 
