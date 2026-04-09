@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { Device } from "./Device";
 import { v7 as uuidv7 } from "uuid";
-import { exec, execFile } from "child_process";
+import { execFile } from "child_process";
 import { WendyCLI } from "../wendy-cli/wendy-cli";
 
 export interface EthernetDevice {
@@ -154,7 +154,7 @@ export class DeviceManager implements vscode.Disposable {
       return;
     }
 
-    exec(`${cli.path} discover --json`, (error, stdout, stderr) => {
+    execFile(cli.path, ['discover', '--json'], (error, stdout, stderr) => {
       if (stderr) {
         console.error('Device discovery stderr:', stderr);
       }
@@ -283,7 +283,7 @@ export class DeviceManager implements vscode.Disposable {
     }
 
     const output = await new Promise<string>((resolve, reject) => {
-      exec(`${cli.path} device version --device ${device.address} --json --check-updates --prerelease`, (error, stdout) => {
+      execFile(cli.path, ['device', 'version', '--device', device.address, '--json', '--check-updates', '--prerelease'], (error, stdout) => {
         if (error) {
           reject(error);
         }
@@ -385,7 +385,7 @@ export class DeviceManager implements vscode.Disposable {
     }, async () => {
       try {
         await new Promise<string>((resolve, reject) => {
-          exec(`${cli.path} device update --device ${device.address}`, (error, stdout) => {
+          execFile(cli.path, ['device', 'update', '--device', device.address], (error, stdout) => {
             if (error) {
               reject(error);
             }
@@ -423,7 +423,7 @@ export class DeviceManager implements vscode.Disposable {
     }
 
     let output = await new Promise<string>((resolve, reject) => {
-      exec(`${cli.path} wifi list --device ${device.address} --json`, (error, stdout) => {
+      execFile(cli.path, ['wifi', 'list', '--device', device.address, '--json'], (error, stdout) => {
         if (error) {
           reject(error);
         }
@@ -454,7 +454,7 @@ export class DeviceManager implements vscode.Disposable {
     }
 
     output = await new Promise<string>((resolve, reject) => {
-      exec(`${cli.path} wifi connect \"${network.label}\" --device ${device.address} --password \"${password}\" --json`, (error, stdout, stderr) => {
+      execFile(cli.path, ['wifi', 'connect', network.label, '--device', device.address, '--password', password, '--json'], (error, stdout, stderr) => {
         if (error) {
           reject(error);
         }
@@ -518,7 +518,7 @@ export class DeviceManager implements vscode.Disposable {
     }
 
     const output = await new Promise<string>((resolve, reject) => {
-      exec(`${cli.path} --json device apps list --device ${deviceAddress}`, (error, stdout, stderr) => {
+      execFile(cli.path, ['--json', 'device', 'apps', 'list', '--device', deviceAddress], (error, stdout, stderr) => {
         if (error) {
           reject(new Error(stderr || error.message));
           return;
@@ -551,7 +551,7 @@ export class DeviceManager implements vscode.Disposable {
     }
 
     await new Promise<void>((resolve, reject) => {
-      exec(`${cli.path} device apps start "${appName}" --device ${deviceAddress}`, (error, stdout, stderr) => {
+      execFile(cli.path, ['device', 'apps', 'start', appName, '--device', deviceAddress], (error, stdout, stderr) => {
         if (error) {
           reject(new Error(stderr || error.message));
           return;
@@ -573,7 +573,7 @@ export class DeviceManager implements vscode.Disposable {
     }
 
     await new Promise<void>((resolve, reject) => {
-      exec(`${cli.path} device apps stop "${appName}" --device ${deviceAddress}`, (error, stdout, stderr) => {
+      execFile(cli.path, ['device', 'apps', 'stop', appName, '--device', deviceAddress], (error, stdout, stderr) => {
         if (error) {
           reject(new Error(stderr || error.message));
           return;
@@ -594,13 +594,13 @@ export class DeviceManager implements vscode.Disposable {
       throw new Error("Failed to create Wendy CLI");
     }
 
-    let args = `device apps remove "${appName}" --device ${deviceAddress}`;
+    const args = ['device', 'apps', 'remove', appName, '--device', deviceAddress];
     if (purgeImage) {
-      args += ' --purge-image';
+      args.push('--purge-image');
     }
 
     await new Promise<void>((resolve, reject) => {
-      exec(`${cli.path} ${args}`, (error, stdout, stderr) => {
+      execFile(cli.path, args, (error, stdout, stderr) => {
         if (error) {
           reject(new Error(stderr || error.message));
           return;
@@ -622,7 +622,7 @@ export class DeviceManager implements vscode.Disposable {
     }
 
     const output = await new Promise<string>((resolve, reject) => {
-      exec(`${cli.path} --json device wifi status --device ${deviceAddress}`, (error, stdout, stderr) => {
+      execFile(cli.path, ['--json', 'device', 'wifi', 'status', '--device', deviceAddress], (error, stdout, stderr) => {
         if (error) {
           reject(new Error(stderr || error.message));
           return;
@@ -658,7 +658,7 @@ export class DeviceManager implements vscode.Disposable {
     }
 
     await new Promise<void>((resolve, reject) => {
-      exec(`${cli.path} device wifi disconnect --device ${deviceAddress}`, (error, stdout, stderr) => {
+      execFile(cli.path, ['device', 'wifi', 'disconnect', '--device', deviceAddress], (error, stdout, stderr) => {
         if (error) {
           reject(new Error(stderr || error.message));
           return;

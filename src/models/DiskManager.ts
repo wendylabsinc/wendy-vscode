@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { Disk } from "./Disk";
 import { WendyCLI } from "../wendy-cli/wendy-cli";
-import { exec } from "child_process";
+import { execFile } from "child_process";
 
 export class DiskManager {
   private outputChannel: vscode.OutputChannel;
@@ -18,7 +18,7 @@ export class DiskManager {
 
     // Execute the wendy os list-drives command
     const output = await new Promise<string>((resolve, reject) => {
-      exec(`${cli.path} os list-drives --json --all`, (error, stdout) => {
+      execFile(cli.path, ['os', 'list-drives', '--json', '--all'], (error, stdout) => {
         if (error) {
           reject(error);
         }
