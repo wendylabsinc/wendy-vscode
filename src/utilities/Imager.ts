@@ -1,4 +1,4 @@
-import { exec } from "child_process";
+import { execFile } from "child_process";
 import { WendyCLI } from "../wendy-cli/wendy-cli";
 
 export class WendyImager {
@@ -9,7 +9,7 @@ export class WendyImager {
     }
 
     const output = await new Promise<string>((resolve, reject) => {
-      exec(`${cli.path} os supported-devices --json`, (error, stdout) => {
+      execFile(cli.path, ['os', 'supported-devices', '--json'], (error, stdout) => {
         if (error) {
           reject(error);
         }

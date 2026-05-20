@@ -48,6 +48,12 @@ export class WendyCLI {
       let wendyCli: string;
       // TODO: Allow overriding the path via a setting.
       switch (process.platform) {
+        case "win32": {
+          const { stdout } = await execFile("where", ["wendy"]);
+          // `where` may return multiple lines; take the first match
+          wendyCli = stdout.trimEnd().split(/\r?\n/)[0];
+          break;
+        }
         case "darwin": {
           const { stdout } = await execFile("which", ["wendy"]);
           wendyCli = stdout.trimEnd();

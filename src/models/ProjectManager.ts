@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { exec } from "child_process";
+import { execFile } from "child_process";
 import { WendyCLI } from "../wendy-cli/wendy-cli";
 
 export type EntitlementType = 'network' | 'video' | 'audio' | 'bluetooth' | 'gpu' | 'persist';
@@ -34,10 +34,10 @@ export class ProjectManager {
     }
 
     return new Promise((resolve, reject) => {
-      const command = `${cli.path} init --path "${projectPath}" --language ${language}`;
-      this.outputChannel.appendLine(`Executing: ${command}`);
+      const args = ['init', '--path', projectPath, '--language', language];
+      this.outputChannel.appendLine(`Executing: ${cli.path} ${args.join(' ')}`);
 
-      exec(command, (error, stdout, stderr) => {
+      execFile(cli.path, args, (error, stdout, stderr) => {
         if (error) {
           this.outputChannel.appendLine(`Error: ${stderr || error.message}`);
           reject(new Error(stderr || error.message));
@@ -67,10 +67,9 @@ export class ProjectManager {
     }
 
     return new Promise((resolve, reject) => {
-      const command = `${cli.path} ${args.join(' ')}`;
-      this.outputChannel.appendLine(`Executing: ${command}`);
+      this.outputChannel.appendLine(`Executing: ${cli.path} ${args.join(' ')}`);
 
-      exec(command, { cwd: projectPath }, (error, stdout, stderr) => {
+      execFile(cli.path, args, { cwd: projectPath }, (error, stdout, stderr) => {
         if (error) {
           this.outputChannel.appendLine(`Error: ${stderr || error.message}`);
           reject(new Error(stderr || error.message));
@@ -98,10 +97,9 @@ export class ProjectManager {
       }
       args.push('--project', projectPath);
 
-      const command = `${cli.path} ${args.join(' ')}`;
-      this.outputChannel.appendLine(`Executing: ${command}`);
+      this.outputChannel.appendLine(`Executing: ${cli.path} ${args.join(' ')}`);
 
-      exec(command, (error, stdout, stderr) => {
+      execFile(cli.path, args, (error, stdout, stderr) => {
         if (error) {
           this.outputChannel.appendLine(`Error: ${stderr || error.message}`);
           reject(new Error(stderr || error.message));
@@ -145,10 +143,9 @@ export class ProjectManager {
     args.push('--project', projectPath);
 
     return new Promise((resolve, reject) => {
-      const command = `${cli.path} ${args.join(' ')}`;
-      this.outputChannel.appendLine(`Executing: ${command}`);
+      this.outputChannel.appendLine(`Executing: ${cli.path} ${args.join(' ')}`);
 
-      exec(command, (error, stdout, stderr) => {
+      execFile(cli.path, args, (error, stdout, stderr) => {
         if (error) {
           this.outputChannel.appendLine(`Error: ${stderr || error.message}`);
           reject(new Error(stderr || error.message));
@@ -172,10 +169,9 @@ export class ProjectManager {
     const args = ['project', 'entitlements', 'remove', '--entitlement-type', type, '--project', projectPath];
 
     return new Promise((resolve, reject) => {
-      const command = `${cli.path} ${args.join(' ')}`;
-      this.outputChannel.appendLine(`Executing: ${command}`);
+      this.outputChannel.appendLine(`Executing: ${cli.path} ${args.join(' ')}`);
 
-      exec(command, (error, stdout, stderr) => {
+      execFile(cli.path, args, (error, stdout, stderr) => {
         if (error) {
           this.outputChannel.appendLine(`Error: ${stderr || error.message}`);
           reject(new Error(stderr || error.message));
