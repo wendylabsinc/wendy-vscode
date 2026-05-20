@@ -1201,6 +1201,16 @@ export async function activate(
     outputChannel.appendLine(`Discovered Wendy CLI at path: ${wendyCLI.path}`);
     outputChannel.appendLine(`Wendy CLI version: ${wendyCLI.version}`);
 
+    // Refresh the wendy.json schema from the CLI so validation always matches the installed version
+    try {
+      const schema = await wendyCLI.getJsonSchema();
+      const schemaPath = path.join(context.extensionPath, "schemas", "wendy-schema.json");
+      await fs.writeFile(schemaPath, schema, "utf-8");
+      outputChannel.appendLine("Updated wendy.json schema from CLI.");
+    } catch (error) {
+      outputChannel.appendLine(`Failed to update wendy.json schema: ${getErrorDescription(error)}`);
+    }
+
     // Create the WendyWorkspaceContext with all the necessary components
     const wendyWorkspaceContext = new WendyWorkspaceContext(
       context,

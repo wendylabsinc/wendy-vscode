@@ -90,6 +90,10 @@ export class WendyCLI {
     const output = await this.exec(["info"]);
     return JSON.parse(output);
   }
+
+  public async getJsonSchema(): Promise<string> {
+    return await this.exec(["json", "schema"]);
+  }
 }
 
 export interface WendyInfo {
