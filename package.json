@@ -243,6 +243,11 @@
         "command": "wendyHardware.refresh",
         "title": "Refresh Hardware",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "wendyHardware.watchCamera",
+        "title": "Watch Camera",
+        "icon": "$(eye)"
       }
     ],
     "menus": {
@@ -395,6 +400,11 @@
           "command": "wendyOperatingSystemCache.deleteEntry",
           "when": "view == wendyOperatingSystemCache && viewItem =~ /operatingSystemCache/",
           "group": "navigation@2"
+        },
+        {
+          "command": "wendyHardware.watchCamera",
+          "when": "view == wendyHardware && viewItem == hardwareDevice-camera",
+          "group": "inline"
         }
       ]
     },
