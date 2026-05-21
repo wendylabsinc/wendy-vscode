@@ -252,7 +252,7 @@
       {
         "command": "wendyHardware.listenAudioInput",
         "title": "Listen",
-        "icon": "$(device-microphone)"
+        "icon": "$(mic)"
       }
     ],
     "menus": {
