@@ -836,6 +836,33 @@ export async function activate(
         terminal.show();
       }),
 
+      // Listen to audio input command
+      vscode.commands.registerCommand("wendyHardware.listenAudioInput", async (item: HardwareDeviceTreeItem) => {
+        if (!item) {
+          return;
+        }
+
+        const cli = await WendyCLI.create();
+        if (!cli) {
+          vscode.window.showErrorMessage("Wendy CLI not found");
+          return;
+        }
+
+        const args = ['device', 'audio', 'listen', '--device', item.deviceAddress];
+        const match = item.hardware.devicePath?.match(/(\d+)$/);
+        if (match) {
+          args.push('--id', match[1]);
+        }
+
+        const label = item.hardware.description || item.hardware.devicePath || 'Audio';
+        const terminal = vscode.window.createTerminal({
+          name: `Audio: ${label}`,
+          shellPath: cli.path,
+          shellArgs: args
+        });
+        terminal.show();
+      }),
+
       // Hardware terminal command
       vscode.commands.registerCommand("wendyHardware.openTerminal", async (deviceAddress?: string) => {
         const address = deviceAddress || deviceManager.getCurrentDevice()?.address;

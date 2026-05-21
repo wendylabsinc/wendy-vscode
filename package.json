@@ -248,6 +248,11 @@
         "command": "wendyHardware.watchCamera",
         "title": "Watch Camera",
         "icon": "$(eye)"
+      },
+      {
+        "command": "wendyHardware.listenAudioInput",
+        "title": "Listen",
+        "icon": "$(device-microphone)"
       }
     ],
     "menus": {
@@ -404,6 +409,11 @@
         {
           "command": "wendyHardware.watchCamera",
           "when": "view == wendyHardware && viewItem == hardwareDevice-camera",
+          "group": "inline"
+        },
+        {
+          "command": "wendyHardware.listenAudioInput",
+          "when": "view == wendyHardware && viewItem == hardwareDevice-audio",
           "group": "inline"
         }
       ]

@@ -54,7 +54,13 @@ export class HardwareDeviceTreeItem extends vscode.TreeItem {
     public readonly deviceAddress: string
   ) {
     super(hardware.description || hardware.devicePath || '', vscode.TreeItemCollapsibleState.None);
-    this.contextValue = hardware.category === 'camera' ? 'hardwareDevice-camera' : 'hardwareDevice';
+    if (hardware.category === 'camera') {
+      this.contextValue = 'hardwareDevice-camera';
+    } else if (hardware.category === 'audio') {
+      this.contextValue = 'hardwareDevice-audio';
+    } else {
+      this.contextValue = 'hardwareDevice';
+    }
     this.description = hardware.devicePath;
     this.tooltip = this.formatTooltip();
   }
