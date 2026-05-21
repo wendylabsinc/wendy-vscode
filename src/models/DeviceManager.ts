@@ -24,6 +24,7 @@ export interface LANDevice {
   hostname: string;
   port: number;
   agentVersion: string | undefined;
+  deviceType?: string;
   interfaceType?: string;
   isWendyDevice?: boolean;
   apps?: LANDeviceApp[];
@@ -78,9 +79,10 @@ export interface WifiStatus {
   ssid: string;
 }
 
-export interface AgentUpdateAvailable {
+export interface DeviceInfo {
   currentVersion: string;
   latestVersion: string | undefined;
+  deviceType?: string;
 }
 
 export interface WifiConnectionResult {
@@ -181,13 +183,17 @@ export class DeviceManager implements vscode.Disposable {
 
     for (const lanDevice of deviceList.lanDevices || []) {
       nextLanDeviceDetails.set(lanDevice.id, lanDevice);
-      foundDevices.push(new Device(
+      const device = new Device(
         lanDevice.id,
         lanDevice.hostname,
         lanDevice.displayName,
         lanDevice.agentVersion,
         "LAN"
-      ));
+      );
+      if (lanDevice.deviceType) {
+        device.deviceType = lanDevice.deviceType;
+      }
+      foundDevices.push(device);
     }
 
     for (const btDevice of deviceList.bluetoothDevices || []) {
@@ -283,7 +289,7 @@ export class DeviceManager implements vscode.Disposable {
     }
 
     const output = await new Promise<string>((resolve, reject) => {
-      execFile(cli.path, ['device', 'version', '--device', device.address, '--json', '--check-updates', '--prerelease'], (error, stdout) => {
+      execFile(cli.path, ['device', 'info', '--device', device.address, '--json', '--check-updates', '--prerelease'], (error, stdout) => {
         if (error) {
           reject(error);
         }
@@ -291,10 +297,14 @@ export class DeviceManager implements vscode.Disposable {
       });
     });
 
-    const updates: AgentUpdateAvailable = JSON.parse(output);
-    if (updates.latestVersion) {
+    const info: DeviceInfo = JSON.parse(output);
+    if (info.deviceType) {
+      device.deviceType = info.deviceType;
+      this._onDevicesChanged.fire();
+    }
+    if (info.latestVersion) {
       const confirmed = await vscode.window.showInformationMessage(
-        `Update available for ${device.name}: ${updates.latestVersion}`,
+        `Update available for ${device.name}: ${info.latestVersion}`,
         "Update"
       );
 
@@ -594,9 +604,9 @@ export class DeviceManager implements vscode.Disposable {
       throw new Error("Failed to create Wendy CLI");
     }
 
-    const args = ['device', 'apps', 'remove', appName, '--device', deviceAddress];
+    const args = ['device', 'apps', 'remove', appName, '--device', deviceAddress, '--force'];
     if (purgeImage) {
-      args.push('--purge-image');
+      args.push('--cleanup');
     }
 
     await new Promise<void>((resolve, reject) => {
@@ -677,7 +687,7 @@ export class DeviceManager implements vscode.Disposable {
       throw new Error("Failed to create Wendy CLI");
     }
 
-    const cliArgs = ['--json', 'hardware', 'list', '--device', deviceAddress];
+    const cliArgs = ['--json', 'device', 'hardware', 'list', '--device', deviceAddress];
     if (category) {
       cliArgs.push('--category', category);
     }
@@ -706,6 +716,20 @@ export class DeviceManager implements vscode.Disposable {
     } catch {
       return [];
     }
+  }
+
+  async listenAudioInput(deviceAddress: string, devicePath?: string): Promise<{ cliPath: string; args: string[] }> {
+    const cli = await WendyCLI.create();
+    if (!cli) {
+      throw new Error("Failed to create Wendy CLI");
+    }
+
+    const args = ['device', 'audio', 'listen', '--device', deviceAddress];
+    if (devicePath) {
+      args.push('--input', devicePath);
+    }
+
+    return { cliPath: cli.path, args };
   }
 
   dispose(): void {

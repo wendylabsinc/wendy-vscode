@@ -2,6 +2,12 @@
  * Represents a Wendy device that can be connected to.
  */
 export class Device {
+  /**
+   * Hardware/product type reported by `wendy device info` (e.g. "Jetson Nano", "Raspberry Pi 4").
+   * Populated asynchronously after the device is discovered.
+   */
+  public deviceType: string | undefined;
+
   constructor(
     /**
      * Unique identifier for the device
@@ -24,7 +30,7 @@ export class Device {
     public readonly agentVersion: string | undefined,
 
     /**
-     * Interface type of the device
+     * Connection mechanism — used for context-menu routing (LAN, BLE, Custom, …)
      */
     public readonly connectionType: "Ethernet" | "USB" | "LAN" | "BLE" | "Docker" | "Local" | "External" | "Custom"
   ) {}

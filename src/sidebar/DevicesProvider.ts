@@ -2,15 +2,29 @@ import * as vscode from "vscode";
 import { Device } from "../models/Device";
 import { DeviceManager, DeviceApp } from "../models/DeviceManager";
 
+function formatDeviceType(raw: string): string {
+  const s = raw.toLowerCase();
+  if (s.startsWith("raspberrypi5")) { return "Raspberry Pi 5"; }
+  if (s.startsWith("raspberrypi4")) { return "Raspberry Pi 4"; }
+  if (s.startsWith("raspberrypi3")) { return "Raspberry Pi 3"; }
+  if (s.startsWith("jetson-agx-orin")) { return "Jetson AGX Orin"; }
+  if (s.startsWith("jetson-orin-nx")) { return "Jetson Orin NX"; }
+  if (s.startsWith("jetson-orin-nano")) { return "Jetson Orin Nano"; }
+  if (s.startsWith("jetson-orin")) { return "Jetson Orin"; }
+  return raw;
+}
+
 export class DeviceTreeItem extends vscode.TreeItem {
   constructor(
     public readonly device: Device,
     private readonly isCurrentDevice: boolean
   ) {
-    super(device.address, vscode.TreeItemCollapsibleState.Collapsed);
+    super(device.name, vscode.TreeItemCollapsibleState.Collapsed);
     this.tooltip = `Agent Version: ${device.agentVersion || 'unknown'}`;
     this.iconPath = new vscode.ThemeIcon("vm");
-    this.description = isCurrentDevice ? `Active (${device.connectionType})` : `(${device.connectionType})`;
+    const rawType = device.deviceType ?? device.connectionType;
+    const displayType = device.deviceType ? formatDeviceType(rawType) : rawType;
+    this.description = isCurrentDevice ? `Active (${displayType})` : `(${displayType})`;
 
     let contextValue = "device";
 

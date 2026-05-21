@@ -8,7 +8,6 @@ import { WendyWorkspaceContext } from "./WendyWorkspaceContext";
 import { WendyTaskProvider } from "./tasks/WendyTaskProvider";
 import * as path from "path";
 import * as fs from "fs/promises";
-import { DocumentationProvider } from "./sidebar/DocumentationProvider";
 import { DevicesProvider, DeviceTreeItem, AppTreeItem } from "./sidebar/DevicesProvider";
 import { DeviceManager, LANDevice } from "./models/DeviceManager";
 import { ProjectManager, EntitlementType } from "./models/ProjectManager";
@@ -16,10 +15,6 @@ import { HardwareProvider, HardwareDeviceTreeItem } from "./sidebar/HardwareProv
 import { DiskManager } from "./models/DiskManager";
 import { WendyDebugConfigurationProvider, WENDY_LAUNCH_CONFIG_TYPE } from "./debugger/WendyDebugConfigurationProvider";
 import { DisksProvider } from "./sidebar/DisksProvider";
-import {
-  OperatingSystemCacheProvider,
-  CacheTreeItem,
-} from "./sidebar/OperatingSystemCacheProvider";
 import { WendyImager } from "./utilities/Imager";
 import { WendyProjectDetector } from "./utilities/WendyProjectDetector";
 import { makeDebugConfigurations, hasAnyWendyDebugConfiguration } from "./debugger/launch";
@@ -61,16 +56,6 @@ export async function activate(
     // Register the hardware provider
     const hardwareProvider = new HardwareProvider(deviceManager);
     vscode.window.registerTreeDataProvider("wendyHardware", hardwareProvider);
-
-    const operatingSystemCacheProvider = new OperatingSystemCacheProvider();
-    const operatingSystemCacheTreeView = vscode.window.createTreeView(
-      "wendyOperatingSystemCache",
-      { treeDataProvider: operatingSystemCacheProvider }
-    );
-    context.subscriptions.push(
-      operatingSystemCacheProvider,
-      operatingSystemCacheTreeView
-    );
 
     const getTargetDeviceTreeItem = (
       item?: DeviceTreeItem
@@ -380,44 +365,6 @@ export async function activate(
       panel.onDidDispose(() => {
         disposable.dispose();
       });
-    };
-
-    const revealRootInFileManager = async (): Promise<void> => {
-      const rootPath = operatingSystemCacheProvider.getRootPath();
-      const rootUri = vscode.Uri.file(rootPath);
-
-      try {
-        await vscode.workspace.fs.stat(rootUri);
-      } catch {
-        void vscode.window.showWarningMessage(
-          `Cache folder '${rootPath}' does not exist.`
-        );
-        return;
-      }
-
-      await vscode.commands.executeCommand("revealFileInOS", rootUri);
-    };
-
-    const revealEntryInFileManager = async (item?: CacheTreeItem): Promise<void> => {
-      const targetItem =
-        item ?? operatingSystemCacheTreeView.selection?.[0];
-
-      if (!targetItem) {
-        return;
-      }
-
-      const targetUri = vscode.Uri.file(targetItem.fullPath);
-
-      try {
-        await vscode.workspace.fs.stat(targetUri);
-      } catch {
-        void vscode.window.showWarningMessage(
-          `Unable to reveal '${targetItem.fullPath}' because it no longer exists.`
-        );
-        return;
-      }
-
-      await vscode.commands.executeCommand("revealFileInOS", targetUri);
     };
 
     devicesProvider.autorefresh();
@@ -1067,44 +1014,6 @@ export async function activate(
       ),
 
       vscode.commands.registerCommand(
-        "wendyOperatingSystemCache.deleteEntry",
-        async (item?: CacheTreeItem) => {
-          const targetItem =
-            item ?? operatingSystemCacheTreeView.selection?.[0];
-
-          if (!targetItem) {
-            return;
-          }
-
-          const entryName =
-            path.basename(targetItem.fullPath) || targetItem.fullPath;
-          const entryType = targetItem.isDirectory ? "folder" : "file";
-          const confirmation = await vscode.window.showWarningMessage(
-            `Delete ${entryType} '${entryName}'? This action cannot be undone.`,
-            { modal: true },
-            "Delete"
-          );
-
-          if (confirmation !== "Delete") {
-            return;
-          }
-
-          try {
-            await fs.rm(targetItem.fullPath, { recursive: true, force: true });
-          } catch (error) {
-            vscode.window.showErrorMessage(
-              `Failed to delete ${entryType} '${entryName}': ${getErrorDescription(
-                error
-              )}`
-            );
-            return;
-          }
-
-          operatingSystemCacheProvider.refresh();
-        }
-      ),
-
-      vscode.commands.registerCommand(
         "wendyDisks.flashDisk",
         async (item) => {
           if (!item || !item.disk) {
@@ -1145,37 +1054,6 @@ export async function activate(
         }
       ),
 
-    );
-
-    const rootRevealCommandIds = [
-      "wendyOperatingSystemCache.openRootFinder",
-      "wendyOperatingSystemCache.openRootExplorer",
-      "wendyOperatingSystemCache.openRootFileManager",
-    ];
-
-    for (const commandId of rootRevealCommandIds) {
-      context.subscriptions.push(
-        vscode.commands.registerCommand(commandId, revealRootInFileManager)
-      );
-    }
-
-    const entryRevealCommandIds = [
-      "wendyOperatingSystemCache.revealFinder",
-      "wendyOperatingSystemCache.revealExplorer",
-      "wendyOperatingSystemCache.revealFileManager",
-    ];
-
-    for (const commandId of entryRevealCommandIds) {
-      context.subscriptions.push(
-        vscode.commands.registerCommand(commandId, revealEntryInFileManager)
-      );
-    }
-
-    // Register the documentation provider
-    const documentationProvider = new DocumentationProvider();
-    vscode.window.registerTreeDataProvider(
-      "wendyDocumentation",
-      documentationProvider
     );
 
     // Register the entitlements editor provider

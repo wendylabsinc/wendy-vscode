@@ -104,7 +104,7 @@ export class WendyCLI {
 
 export interface WendyInfo {
   version: string;
-  swift: {
+  swift?: {
     version: string;
     sdk: string;
     sdkDownloadURL: string;

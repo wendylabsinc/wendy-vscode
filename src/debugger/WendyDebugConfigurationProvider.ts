@@ -338,6 +338,13 @@ export class WendyDebugConfigurationProvider
       return null;
     }
 
+    if (!wendyInfo.swift) {
+      vscode.window.showErrorMessage(
+        "Swift SDK information is not available. Ensure your app is configured for Swift debugging."
+      );
+      return null;
+    }
+
     const sdkPath = path.join(os.homedir(), ".swiftpm", "swift-sdks");
     const sdkBundle = wendyInfo.swift.sdk;
 

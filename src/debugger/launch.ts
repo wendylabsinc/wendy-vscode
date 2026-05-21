@@ -42,54 +42,8 @@ export async function makeDebugConfigurations(
 async function createExecutableConfigurations(context: WendyFolderContext) {
     console.log(`[Wendy] Generating debug configurations for folder: ${context.folder.fsPath}`);
 
-    if (context.swift === undefined) {
-        return [
-            {
-                type: WENDY_LAUNCH_CONFIG_TYPE,
-                name: `Debug Python App with Wendy`,
-                request: "attach",
-                target: context.folder.path,
-                cwd: context.folder.fsPath,
-                preLaunchTask: `wendy: Run Python App`
-            }
-        ];
-    }
-
-    const executableProducts = await context.swift.swiftPackage.executableProducts;
-    console.log(`[Wendy] Found ${executableProducts.length} executable products`);
-
-    // Also include dynamic library products
-    const allProducts = await (context.swift.swiftPackage as any).products as
-        | { name: string; targets: string[]; type: { executable?: null; library?: string[] } }[]
-        | undefined;
-
-    const dynamicLibProducts = allProducts?.filter(
-        p => p.type.library && p.type.library.includes("dynamic")
-    ) ?? [];
-    console.log(`[Wendy] Found ${dynamicLibProducts.length} dynamic library products`);
-
-    const products = [...executableProducts, ...dynamicLibProducts];
-
-    if (products.length === 0) {
-        return [];
-    }
-
-    // Windows understand the forward slashes, so make the configuration unified as posix path
-    // to make it easier for users switching between platforms.
-    const { folder } = getFolderAndNameSuffix(context.swift, undefined, "posix");
-    console.log(`[Wendy] Using folder path: ${folder}`);
-
-    return products.map(product => {
-        console.log(`[Wendy] Creating configuration for product: ${product.name}`);
-        return {
-            type: WENDY_LAUNCH_CONFIG_TYPE,
-            name: `Debug ${product.name} with Wendy`,
-            request: "attach",
-            target: product.name,
-            cwd: folder,
-            preLaunchTask: `wendy: Run ${product.name}`
-        };
-    });
+    // TODO: Debugger attachment to Swift and Python containers is not yet supported
+    return [];
 }
 
 /**

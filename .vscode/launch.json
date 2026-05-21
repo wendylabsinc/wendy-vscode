@@ -7,10 +7,10 @@
 	"configurations": [
 		{
 			"type": "wendy",
-			"name": "Debug Python App on WendyOS",
+			"name": "Debug Python App with Wendy",
 			"request": "attach",
-			"target": "/Users/joannisorlandos/git/wendy/edge-vscode",
-			"cwd": "/Users/joannisorlandos/git/wendy/edge-vscode",
+			"target": "/Users/joannisorlandos/git/wendy/wendy-vscode",
+			"cwd": "/Users/joannisorlandos/git/wendy/wendy-vscode",
 			"preLaunchTask": "wendy: Run Python App"
 		},
 		{
