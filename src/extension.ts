@@ -12,7 +12,7 @@ import { DocumentationProvider } from "./sidebar/DocumentationProvider";
 import { DevicesProvider, DeviceTreeItem, AppTreeItem } from "./sidebar/DevicesProvider";
 import { DeviceManager, LANDevice } from "./models/DeviceManager";
 import { ProjectManager, EntitlementType } from "./models/ProjectManager";
-import { HardwareProvider } from "./sidebar/HardwareProvider";
+import { HardwareProvider, HardwareDeviceTreeItem } from "./sidebar/HardwareProvider";
 import { DiskManager } from "./models/DiskManager";
 import { WendyDebugConfigurationProvider, WENDY_LAUNCH_CONFIG_TYPE } from "./debugger/WendyDebugConfigurationProvider";
 import { DisksProvider } from "./sidebar/DisksProvider";
@@ -807,6 +807,33 @@ export async function activate(
       // Hardware refresh command
       vscode.commands.registerCommand("wendyHardware.refresh", () => {
         hardwareProvider.refresh();
+      }),
+
+      // Watch camera command
+      vscode.commands.registerCommand("wendyHardware.watchCamera", async (item: HardwareDeviceTreeItem) => {
+        if (!item) {
+          return;
+        }
+
+        const cli = await WendyCLI.create();
+        if (!cli) {
+          vscode.window.showErrorMessage("Wendy CLI not found");
+          return;
+        }
+
+        const args = ['device', 'camera', 'view', '--device', item.deviceAddress];
+        const match = item.hardware.devicePath?.match(/(\d+)$/);
+        if (match) {
+          args.push('--id', match[1]);
+        }
+
+        const label = item.hardware.description || item.hardware.devicePath || 'Camera';
+        const terminal = vscode.window.createTerminal({
+          name: `Camera: ${label}`,
+          shellPath: cli.path,
+          shellArgs: args
+        });
+        terminal.show();
       }),
 
       // Hardware terminal command
