@@ -50,10 +50,11 @@ export class HardwareCategoryTreeItem extends vscode.TreeItem {
 
 export class HardwareDeviceTreeItem extends vscode.TreeItem {
   constructor(
-    public readonly hardware: HardwareDevice
+    public readonly hardware: HardwareDevice,
+    public readonly deviceAddress: string
   ) {
     super(hardware.description || hardware.devicePath || '', vscode.TreeItemCollapsibleState.None);
-    this.contextValue = "hardwareDevice";
+    this.contextValue = hardware.category === 'camera' ? 'hardwareDevice-camera' : 'hardwareDevice';
     this.description = hardware.devicePath;
     this.tooltip = this.formatTooltip();
   }
@@ -116,7 +117,7 @@ export class HardwareProvider implements vscode.TreeDataProvider<HardwareTreeIte
 
     // Handle category children
     if (element instanceof HardwareCategoryTreeItem) {
-      return element.devices.map(hw => new HardwareDeviceTreeItem(hw));
+      return element.devices.map(hw => new HardwareDeviceTreeItem(hw, currentDevice.address));
     }
 
     if (element) {
