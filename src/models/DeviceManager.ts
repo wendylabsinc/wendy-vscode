@@ -27,6 +27,12 @@ export interface LANDevice {
   deviceType?: string;
   interfaceType?: string;
   isWendyDevice?: boolean;
+  /**
+   * Non-empty when the device is reachable over a USB/Ethernet-gadget interface.
+   * Mirrors the `usb` field added to LAN device entries in `wendy discover --json`.
+   * Example value: "enp0s20f0u9 480 Mbps"
+   */
+  usb?: string;
   apps?: LANDeviceApp[];
 }
 
