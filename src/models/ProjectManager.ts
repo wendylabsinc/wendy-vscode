@@ -18,6 +18,18 @@ export interface EntitlementOptions {
   path?: string;
 }
 
+export interface BuildProjectOptions {
+  /** Specific Dockerfile to build from (e.g. "Dockerfile.prod"). When omitted,
+   *  the CLI will auto-detect or show an interactive picker. */
+  dockerfile?: string;
+  /** Build type to use when multiple project markers are present: docker, swift, or python. */
+  buildType?: string;
+  /** Target device address. */
+  deviceAddress?: string;
+  /** Executable name to build. */
+  executable?: string;
+}
+
 /**
  * Manages Wendy project operations
  */
@@ -50,20 +62,55 @@ export class ProjectManager {
   }
 
   /**
-   * Build and push a Wendy project without running it
+   * Build and push a Wendy project without running it.
+   *
+   * Accepts either the legacy positional-style arguments or a structured
+   * {@link BuildProjectOptions} bag. The options bag is preferred for new
+   * call-sites because it exposes the `--dockerfile` and `--build-type` flags
+   * added in CLI PR #742.
    */
-  async buildProject(projectPath: string, executable?: string, deviceAddress?: string): Promise<void> {
+  async buildProject(
+    projectPath: string,
+    executableOrOptions?: string | BuildProjectOptions,
+    deviceAddress?: string
+  ): Promise<void> {
     const cli = await WendyCLI.create();
     if (!cli) {
       throw new Error("Wendy CLI not found");
     }
 
-    let args = ['build', '-y'];
+    // Normalise overloaded arguments.
+    let executable: string | undefined;
+    let resolvedDeviceAddress: string | undefined;
+    let dockerfile: string | undefined;
+    let buildType: string | undefined;
+
+    if (executableOrOptions && typeof executableOrOptions === 'object') {
+      executable = executableOrOptions.executable;
+      resolvedDeviceAddress = executableOrOptions.deviceAddress;
+      dockerfile = executableOrOptions.dockerfile;
+      buildType = executableOrOptions.buildType;
+    } else {
+      executable = executableOrOptions as string | undefined;
+      resolvedDeviceAddress = deviceAddress;
+    }
+
+    const args: string[] = ['build', '-y'];
+
     if (executable) {
       args.push(executable);
     }
-    if (deviceAddress) {
-      args.push('--device', deviceAddress);
+    if (resolvedDeviceAddress) {
+      args.push('--device', resolvedDeviceAddress);
+    }
+    // --dockerfile implies a Docker build; pass it before --build-type so the
+    // CLI can apply its own normalisation. validateDockerfileName in the CLI
+    // enforces the naming convention; we pass the value as-is.
+    if (dockerfile) {
+      args.push('--dockerfile', dockerfile);
+    }
+    if (buildType) {
+      args.push('--build-type', buildType);
     }
 
     return new Promise((resolve, reject) => {
