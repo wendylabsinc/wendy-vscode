@@ -1,238 +1,81 @@
 import * as vscode from "vscode";
-import * as path from "path";
-import * as fs from "fs/promises";
-import * as os from "os";
+import { WendyCLI } from "../wendy-cli/wendy-cli";
+import { execFile } from "../utilities/utilities";
 
-export class CacheTreeItem extends vscode.TreeItem {
-  constructor(
-    public readonly fullPath: string,
-    public readonly isDirectory: boolean
-  ) {
-    super(
-      path.basename(fullPath) || fullPath,
-      isDirectory
-        ? vscode.TreeItemCollapsibleState.Collapsed
-        : vscode.TreeItemCollapsibleState.None
-    );
-
-    this.resourceUri = vscode.Uri.file(fullPath);
-    this.contextValue = isDirectory
-      ? "operatingSystemCacheDirectory"
-      : "operatingSystemCacheFile";
-    this.iconPath = new vscode.ThemeIcon(isDirectory ? "folder" : "file");
-
-    if (!isDirectory) {
-      this.command = {
-        command: "vscode.open",
-        title: "Open File",
-        arguments: [this.resourceUri],
-      };
-    }
-  }
+export interface OsCacheEntry {
+  name: string;
+  sizeBytes: number;
+  size: string;
 }
 
 export class OperatingSystemCacheProvider
-  implements vscode.TreeDataProvider<CacheTreeItem>, vscode.Disposable
+  implements vscode.TreeDataProvider<OsCacheItem>
 {
-  private readonly _onDidChangeTreeData =
-    new vscode.EventEmitter<CacheTreeItem | undefined | null | void>();
+  private _onDidChangeTreeData = new vscode.EventEmitter<
+    OsCacheItem | undefined | void
+  >();
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 
-  private readonly disposables: vscode.Disposable[] = [];
-  private watcher?: vscode.FileSystemWatcher;
-  private watcherDisposables: vscode.Disposable[] = [];
-  private refreshTimeout?: NodeJS.Timeout;
-  private currentRoot: string | undefined;
-
-  constructor() {
-    this.disposables.push(
-      vscode.workspace.onDidChangeConfiguration((event) => {
-        if (event.affectsConfiguration("wendy.cache.root")) {
-          this.ensureWatcher(true);
-        }
-      })
-    );
-
-    this.ensureWatcher(false);
-  }
+  constructor(private readonly outputChannel: vscode.OutputChannel) {}
 
   refresh(): void {
     this._onDidChangeTreeData.fire();
   }
 
-  getTreeItem(element: CacheTreeItem): vscode.TreeItem {
+  getTreeItem(element: OsCacheItem): vscode.TreeItem {
     return element;
   }
 
-  async getChildren(element?: CacheTreeItem): Promise<CacheTreeItem[]> {
-    this.ensureWatcher(false);
-
-    const targetPath = element?.fullPath ?? this.getCacheRoot();
-
-    if (!(await this.pathExists(targetPath))) {
+  async getChildren(element?: OsCacheItem): Promise<OsCacheItem[]> {
+    if (element) {
       return [];
     }
 
-    return this.getDirectoryEntries(targetPath);
+    const entries = await this.listOsCacheEntries();
+    if (entries.length === 0) {
+      return [new OsCacheEmptyItem()];
+    }
+    return entries.map((e) => new OsCacheItem(e));
   }
 
-  getRootPath(): string {
-    return this.getCacheRoot();
-  }
+  private async listOsCacheEntries(): Promise<OsCacheEntry[]> {
+    const cli = await WendyCLI.create();
+    if (!cli) {
+      return [];
+    }
 
-  private async getDirectoryEntries(
-    directory: string
-  ): Promise<CacheTreeItem[]> {
     try {
-      const dirents = await fs.readdir(directory, { withFileTypes: true });
-
-      const entries = dirents
-        .map((entry) => {
-          const entryPath = path.join(directory, entry.name);
-          return {
-            entryPath,
-            isDirectory: entry.isDirectory(),
-            name: entry.name,
-          };
-        })
-        .sort((a, b) => {
-          if (a.isDirectory !== b.isDirectory) {
-            return a.isDirectory ? -1 : 1;
-          }
-
-          return a.name.localeCompare(b.name);
-        });
-
-      return entries.map(
-        (entry) => new CacheTreeItem(entry.entryPath, entry.isDirectory)
-      );
+      const { stdout } = await execFile(cli.path, [
+        "--json",
+        "os",
+        "cache",
+        "list",
+      ]);
+      const parsed: OsCacheEntry[] = JSON.parse(stdout.trim());
+      return Array.isArray(parsed) ? parsed : [];
     } catch (error) {
-      const err = error as NodeJS.ErrnoException;
-      if (err?.code === "ENOENT" || err?.code === "EACCES") {
-        return [];
-      }
-
-      void vscode.window.showErrorMessage(
-        `Failed to read Wendy cache directory: ${err?.message ?? error}`
+      this.outputChannel.appendLine(
+        `Failed to list OS cache: ${error instanceof Error ? error.message : String(error)}`
       );
       return [];
     }
   }
+}
 
-  private ensureWatcher(forceRefresh: boolean): void {
-    const rootPath = this.getCacheRoot();
-
-    if (!forceRefresh && this.currentRoot === rootPath && this.watcher) {
-      return;
-    }
-
-    this.currentRoot = rootPath;
-    this.resetWatcher(rootPath);
+export class OsCacheItem extends vscode.TreeItem {
+  constructor(public readonly entry: OsCacheEntry) {
+    super(entry.name, vscode.TreeItemCollapsibleState.None);
+    this.description = entry.size;
+    this.tooltip = `${entry.name}\n${entry.size} (${entry.sizeBytes.toLocaleString()} bytes)`;
+    this.contextValue = "osCacheEntry";
+    this.iconPath = new vscode.ThemeIcon("archive");
   }
+}
 
-  private resetWatcher(rootPath: string): void {
-    this.disposeWatcher();
-
-    try {
-      const pattern = new vscode.RelativePattern(rootPath, "**/*");
-      const watcher = vscode.workspace.createFileSystemWatcher(pattern);
-      this.watcher = watcher;
-
-      const onFsEvent = (): void => {
-        this.scheduleRefresh();
-      };
-
-      this.watcherDisposables = [
-        watcher.onDidCreate(onFsEvent),
-        watcher.onDidChange(onFsEvent),
-        watcher.onDidDelete(onFsEvent),
-      ];
-    } catch (error) {
-      const err = error as Error;
-      void vscode.window.showErrorMessage(
-        `Failed to watch Wendy cache directory: ${err.message}`
-      );
-      this.watcher = undefined;
-      this.watcherDisposables = [];
-    }
-
-    this.scheduleRefresh();
-  }
-
-  private scheduleRefresh(): void {
-    if (this.refreshTimeout) {
-      clearTimeout(this.refreshTimeout);
-    }
-
-    this.refreshTimeout = setTimeout(() => {
-      this.refresh();
-      this.refreshTimeout = undefined;
-    }, 200);
-  }
-
-  private getCacheRoot(): string {
-    const configuredRoot = vscode.workspace
-      .getConfiguration("wendy")
-      .get<string>("cache.root");
-    const trimmed = configuredRoot?.trim();
-
-    if (trimmed) {
-      return path.resolve(this.expandHome(trimmed));
-    }
-
-    if (process.platform === "win32") {
-      const localAppData =
-        process.env.LOCALAPPDATA ||
-        path.join(os.homedir(), "AppData", "Local");
-      return path.join(localAppData, ".wendy", "images");
-    }
-
-    if (process.platform === "darwin") {
-      return path.join(os.homedir(), "Library", "Caches", ".wendy", "images");
-    }
-
-    // Linux: use XDG_CACHE_HOME or fallback to ~/.cache
-    const xdgCache = process.env.XDG_CACHE_HOME || path.join(os.homedir(), ".cache");
-    return path.join(xdgCache, ".wendy", "images");
-  }
-
-  private expandHome(targetPath: string): string {
-    if (targetPath === "~") {
-      return os.homedir();
-    }
-
-    if (targetPath.startsWith("~/") || targetPath.startsWith("~\\")) {
-      return path.join(os.homedir(), targetPath.slice(2));
-    }
-    return targetPath;
-  }
-
-  private async pathExists(targetPath: string): Promise<boolean> {
-    try {
-      await fs.access(targetPath);
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  private disposeWatcher(): void {
-    this.watcher?.dispose();
-    this.watcher = undefined;
-
-    this.watcherDisposables.forEach((disposable) => disposable.dispose());
-    this.watcherDisposables = [];
-  }
-
-  dispose(): void {
-    this.disposeWatcher();
-
-    if (this.refreshTimeout) {
-      clearTimeout(this.refreshTimeout);
-      this.refreshTimeout = undefined;
-    }
-
-    this.disposables.forEach((disposable) => disposable.dispose());
-    this._onDidChangeTreeData.dispose();
+class OsCacheEmptyItem extends vscode.TreeItem {
+  constructor() {
+    super("No cached OS images", vscode.TreeItemCollapsibleState.None);
+    this.contextValue = "osCacheEmpty";
+    this.iconPath = new vscode.ThemeIcon("info");
   }
 }
