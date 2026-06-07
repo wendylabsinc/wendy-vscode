@@ -34,11 +34,27 @@
       "default": false,
       "description": "Enable debug mode."
     },
+    "isolation": {
+      "type": "string",
+      "description": "Isolation mode applied to every service in a compose group (e.g. \"shared-ipc\"). Has no effect for single-service apps.",
+      "examples": ["shared-ipc"]
+    },
+    "runtimes": {
+      "$ref": "#/$defs/runtimesConfig",
+      "description": "Default runtime configuration applied to every service in a compose group. Per-service entries in \"services\" can override this."
+    },
     "entitlements": {
       "type": "array",
-      "description": "Capabilities the app requires (GPU, network, Bluetooth, etc.).",
+      "description": "Capabilities the app requires (GPU, network, Bluetooth, etc.). For compose apps, declare per-service entitlements under \"services\" instead.",
       "items": {
         "$ref": "#/$defs/entitlement"
+      }
+    },
+    "services": {
+      "type": "object",
+      "description": "Compose-companion service overrides. Keys must match Docker Compose service names. Use this to add Wendy-specific entitlements or runtime config to individual services without modifying docker-compose.yml.",
+      "additionalProperties": {
+        "$ref": "#/$defs/serviceConfig"
       }
     },
     "readiness": {
@@ -62,6 +78,52 @@
     }
   },
   "$defs": {
+    "ros2Config": {
+      "type": "object",
+      "description": "ROS 2 runtime configuration.",
+      "additionalProperties": false,
+      "properties": {
+        "domainId": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 232,
+          "description": "ROS_DOMAIN_ID — isolates ROS 2 nodes into independent communication domains. Valid range: 0–232."
+        },
+        "rmw": {
+          "type": "string",
+          "description": "ROS middleware implementation to use (e.g. \"cyclonedds\", \"fastrtps\").",
+          "examples": ["cyclonedds", "fastrtps"]
+        }
+      }
+    },
+    "runtimesConfig": {
+      "type": "object",
+      "description": "Runtime configuration for optional middleware or frameworks.",
+      "additionalProperties": false,
+      "properties": {
+        "ros2": {
+          "$ref": "#/$defs/ros2Config"
+        }
+      }
+    },
+    "serviceConfig": {
+      "type": "object",
+      "description": "Wendy-specific configuration for a single Docker Compose service.",
+      "additionalProperties": false,
+      "properties": {
+        "entitlements": {
+          "type": "array",
+          "description": "Hardware entitlements for this service. Appended after compose-synthesised entitlements (e.g. ports → network, named volumes → persist).",
+          "items": {
+            "$ref": "#/$defs/entitlement"
+          }
+        },
+        "runtimes": {
+          "$ref": "#/$defs/runtimesConfig",
+          "description": "Runtime configuration for this service. Overrides the top-level \"runtimes\" default."
+        }
+      }
+    },
     "entitlement": {
       "type": "object",
       "required": ["type"],
