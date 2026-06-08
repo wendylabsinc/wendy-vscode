@@ -34,11 +34,27 @@
       "default": false,
       "description": "Enable debug mode."
     },
+    "isolation": {
+      "type": "string",
+      "enum": ["isolated", "shared-ipc", "shared-network"],
+      "description": "Isolation mode for multi-service apps. \"isolated\" gives each container its own CNI-assigned IP with /etc/hosts-based service discovery. \"shared-ipc\" shares IPC, network, and UTS namespaces plus /dev/shm between all services. \"shared-network\" shares network and UTS namespaces (suitable for ROS2 DDS multicast)."
+    },
+    "frameworks": {
+      "$ref": "#/$defs/frameworks",
+      "description": "Framework-specific configuration applied to all services unless overridden per-service."
+    },
     "entitlements": {
       "type": "array",
       "description": "Capabilities the app requires (GPU, network, Bluetooth, etc.).",
       "items": {
         "$ref": "#/$defs/entitlement"
+      }
+    },
+    "services": {
+      "type": "object",
+      "description": "Named services that make up a multi-container app group. Each key is the service name; the value describes how to build and configure that service.",
+      "additionalProperties": {
+        "$ref": "#/$defs/serviceDefinition"
       }
     },
     "readiness": {
@@ -62,6 +78,64 @@
     }
   },
   "$defs": {
+    "serviceDefinition": {
+      "type": "object",
+      "description": "Configuration for a single service within a multi-container app group.",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "type": "string",
+          "description": "Path to the build context directory (relative to wendy.json) used when building the service image."
+        },
+        "dependsOn": {
+          "type": "array",
+          "description": "Names of services that must start before this service. Wendy uses topological ordering so dependents stop before dependencies on shutdown.",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "entitlements": {
+          "type": "array",
+          "description": "Capabilities this specific service requires.",
+          "items": {
+            "$ref": "#/$defs/entitlement"
+          }
+        },
+        "frameworks": {
+          "$ref": "#/$defs/frameworks",
+          "description": "Framework-specific configuration for this service. Overrides any top-level frameworks config."
+        }
+      }
+    },
+    "frameworks": {
+      "type": "object",
+      "description": "Framework-specific runtime configuration.",
+      "additionalProperties": false,
+      "properties": {
+        "ros2": {
+          "$ref": "#/$defs/ros2Framework"
+        }
+      }
+    },
+    "ros2Framework": {
+      "type": "object",
+      "description": "ROS2 framework configuration. Wendy automatically injects ROS_DOMAIN_ID and RMW_IMPLEMENTATION environment variables into the container at start time.",
+      "additionalProperties": false,
+      "properties": {
+        "domainId": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 232,
+          "description": "ROS2 domain ID. Injected as the ROS_DOMAIN_ID environment variable."
+        },
+        "rmw": {
+          "type": "string",
+          "description": "ROS2 middleware implementation identifier. Injected as the RMW_IMPLEMENTATION environment variable (e.g. \"rmw_cyclonedds_cpp\", \"rmw_fastrtps_cpp\")."
+        }
+      }
+    },
     "entitlement": {
       "type": "object",
       "required": ["type"],
@@ -74,6 +148,13 @@
               "type": "string",
               "enum": ["host", "none"],
               "description": "Network mode. \"host\" shares the host network stack; \"none\" disables networking."
+            },
+            "ports": {
+              "type": "array",
+              "description": "Port mappings to expose from the container.",
+              "items": {
+                "$ref": "#/$defs/portMapping"
+              }
             }
           },
           "required": ["type"],
@@ -217,6 +298,26 @@
           "description": "HID input device access (barcode scanners, keyboards, etc.)."
         }
       ]
+    },
+    "portMapping": {
+      "type": "object",
+      "description": "A host-to-container port mapping.",
+      "required": ["host", "container"],
+      "additionalProperties": false,
+      "properties": {
+        "host": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535,
+          "description": "Port number on the host device."
+        },
+        "container": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535,
+          "description": "Port number inside the container."
+        }
+      }
     },
     "readiness": {
       "type": "object",
