@@ -8,6 +8,18 @@ export class Device {
    */
   public deviceType: string | undefined;
 
+  /**
+   * Root filesystem bytes currently used on the device.
+   * Only present when the agent can inspect disk usage (field added in CLI PR #919).
+   */
+  public diskUsedBytes: number | undefined;
+
+  /**
+   * Root filesystem total bytes on the device.
+   * Only present when the agent can inspect disk usage (field added in CLI PR #919).
+   */
+  public diskTotalBytes: number | undefined;
+
   constructor(
     /**
      * Unique identifier for the device
@@ -34,4 +46,26 @@ export class Device {
      */
     public readonly connectionType: "Ethernet" | "USB" | "LAN" | "BLE" | "Docker" | "Local" | "External" | "Custom"
   ) {}
+
+  /**
+   * Returns a human-readable disk usage string in the same format as the CLI
+   * human output: e.g. "2.34 GB / 120 GB".
+   * Returns undefined when either byte count is not available.
+   */
+  get diskUsageLabel(): string | undefined {
+    if (this.diskUsedBytes === undefined || this.diskTotalBytes === undefined) {
+      return undefined;
+    }
+    return `${formatGigabytes(this.diskUsedBytes)} / ${formatGigabytes(this.diskTotalBytes)}`;
+  }
+}
+
+/**
+ * Formats a byte count as a compact gigabyte string using SI units (powers of 1000),
+ * mirroring the `formatGigabytes` helper used by the CLI (go/internal/cli/commands/bytes_format.go).
+ * Trailing zeros after the decimal point are trimmed (e.g. "120.00 GB" → "120 GB").
+ */
+function formatGigabytes(bytes: number): string {
+  const gb = (bytes / 1_000_000_000).toFixed(2).replace(/\.?0+$/, "");
+  return `${gb} GB`;
 }
