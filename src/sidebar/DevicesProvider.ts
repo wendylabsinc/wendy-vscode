@@ -1,144 +1,133 @@
 import * as vscode from "vscode";
 import { Device } from "../models/Device";
-import { DeviceManager, DeviceApp } from "../models/DeviceManager";
+import { DeviceManager } from "../models/DeviceManager";
+import { WendyCLI } from "../wendy-cli/wendy-cli";
 
-function formatDeviceType(raw: string): string {
-  const s = raw.toLowerCase();
-  if (s.startsWith("raspberrypi5")) { return "Raspberry Pi 5"; }
-  if (s.startsWith("raspberrypi4")) { return "Raspberry Pi 4"; }
-  if (s.startsWith("raspberrypi3")) { return "Raspberry Pi 3"; }
-  if (s.startsWith("jetson-agx-orin")) { return "Jetson AGX Orin"; }
-  if (s.startsWith("jetson-orin-nx")) { return "Jetson Orin NX"; }
-  if (s.startsWith("jetson-orin-nano")) { return "Jetson Orin Nano"; }
-  if (s.startsWith("jetson-orin")) { return "Jetson Orin"; }
-  return raw;
+/**
+ * Tree data provider for the Wendy Devices sidebar view.
+ * Manages the display and interaction with Wendy devices.
+ */
+export class DevicesProvider implements vscode.TreeDataProvider<DeviceTreeItem> {
+  private _onDidChangeTreeData = new vscode.EventEmitter<
+    DeviceTreeItem | undefined | void
+  >();
+  readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
+
+  constructor(
+    private readonly deviceManager: DeviceManager,
+    private readonly cli: WendyCLI | undefined
+  ) {}
+
+  refresh(): void {
+    this._onDidChangeTreeData.fire();
+  }
+
+  getTreeItem(element: DeviceTreeItem): vscode.TreeItem {
+    return element;
+  }
+
+  getChildren(element?: DeviceTreeItem): DeviceTreeItem[] {
+    if (element) {
+      return [];
+    }
+    return this.deviceManager.devices.map(
+      (d) => new DeviceTreeItem(d, this.deviceManager.currentDeviceId === d.id)
+    );
+  }
+
+  /**
+   * Registers all device-related commands with the extension context.
+   */
+  registerCommands(context: vscode.ExtensionContext): void {
+    context.subscriptions.push(
+      vscode.commands.registerCommand(
+        "wendyDevices.unenrollDevice",
+        async (item: DeviceTreeItem | undefined) => {
+          await this.unenrollDevice(item);
+        }
+      )
+    );
+  }
+
+  /**
+   * Prompts the user for confirmation and then unenrolls the given device,
+   * resetting it to an unprovisioned state and removing it from Wendy Cloud.
+   */
+  private async unenrollDevice(
+    item: DeviceTreeItem | undefined
+  ): Promise<void> {
+    if (!this.cli) {
+      vscode.window.showErrorMessage(
+        "Wendy CLI is not available. Please check your installation."
+      );
+      return;
+    }
+
+    const device = item?.device;
+    if (!device) {
+      vscode.window.showErrorMessage("No device selected for unenrollment.");
+      return;
+    }
+
+    const confirmed = await vscode.window.showWarningMessage(
+      `Unenroll "${device.name}" (${device.address})?\n\nThis will reset the device to an unprovisioned state and delete its asset record from Wendy Cloud. This action cannot be undone.`,
+      { modal: true },
+      "Unenroll"
+    );
+
+    if (confirmed !== "Unenroll") {
+      return;
+    }
+
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: `Unenrolling device "${device.name}"…`,
+        cancellable: false,
+      },
+      async () => {
+        try {
+          await this.cli!.unenrollDevice(device.address);
+          vscode.window.showInformationMessage(
+            `Device "${device.name}" has been unenrolled and its cloud asset removed.`
+          );
+          this.refresh();
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : String(error);
+          vscode.window.showErrorMessage(
+            `Failed to unenroll device "${device.name}": ${message}`
+          );
+        }
+      }
+    );
+  }
 }
 
 export class DeviceTreeItem extends vscode.TreeItem {
   constructor(
     public readonly device: Device,
-    private readonly isCurrentDevice: boolean
+    public readonly isCurrent: boolean
   ) {
-    super(device.name, vscode.TreeItemCollapsibleState.Collapsed);
-    this.tooltip = `Agent Version: ${device.agentVersion || 'unknown'}`;
-    this.iconPath = new vscode.ThemeIcon("vm");
-    const rawType = device.deviceType ?? device.connectionType;
-    const displayType = device.deviceType ? formatDeviceType(rawType) : rawType;
-    this.description = isCurrentDevice ? `Active (${displayType})` : `(${displayType})`;
+    super(device.name, vscode.TreeItemCollapsibleState.None);
 
-    let contextValue = "device";
+    this.description = device.address;
+    this.tooltip = [
+      `Name: ${device.name}`,
+      `Address: ${device.address}`,
+      `Type: ${device.connectionType}`,
+      device.agentVersion ? `Agent: ${device.agentVersion}` : undefined,
+      device.deviceType ? `Hardware: ${device.deviceType}` : undefined,
+    ]
+      .filter(Boolean)
+      .join("\n");
 
-    if (isCurrentDevice) {
-      contextValue += "-current";
+    // Build the contextValue so menu `when` clauses can match on it.
+    // Format: "device/LAN/current" or "device/LAN" etc.
+    const parts = ["device", device.connectionType];
+    if (isCurrent) {
+      parts.push("current");
     }
-
-    contextValue += `-${device.connectionType}`;
-
-    this.contextValue = contextValue;
-    this.id = device.id;
-  }
-}
-
-export class AppTreeItem extends vscode.TreeItem {
-  public readonly isRunning: boolean;
-
-  constructor(
-    public readonly app: DeviceApp,
-    public readonly deviceAddress: string
-  ) {
-    super(app.name, vscode.TreeItemCollapsibleState.None);
-    const state = app.runningState?.toLowerCase() || 'unknown';
-    const version = app.version || '';
-    this.isRunning = state === 'running';
-    this.tooltip = `${app.name}\nVersion: ${version}\nState: ${app.runningState || 'Unknown'}`;
-    this.iconPath = new vscode.ThemeIcon(this.isRunning ? "play" : "debug-stop");
-    this.description = `${version} (${state})`;
-    // Include running state in contextValue for conditional menus
-    this.contextValue = this.isRunning ? "app-running" : "app-stopped";
-  }
-}
-
-
-type DevicesTreeItem = DeviceTreeItem | AppTreeItem;
-
-export class DevicesProvider
-  implements vscode.TreeDataProvider<DevicesTreeItem>
-{
-  private _onDidChangeTreeData: vscode.EventEmitter<
-    DevicesTreeItem | undefined | null | void
-  > = new vscode.EventEmitter<DevicesTreeItem | undefined | null | void>();
-  readonly onDidChangeTreeData: vscode.Event<
-    DevicesTreeItem | undefined | null | void
-  > = this._onDidChangeTreeData.event;
-
-  private appsCache: Map<string, DeviceApp[]> = new Map();
-
-  constructor(private deviceManager: DeviceManager) {
-    // Listen for device changes
-    this.deviceManager.onDevicesChanged(() => {
-      this.appsCache.clear();
-      this.refresh();
-    });
-
-    // Listen for current device changes
-    this.deviceManager.onCurrentDeviceChanged(() => {
-      this.refresh();
-    });
-  }
-
-  refresh(): void {
-    this.appsCache.clear();
-    this._onDidChangeTreeData.fire();
-  }
-
-  autorefresh(): void {
-    this.deviceManager.startDiscovery();
-  }
-
-  getTreeItem(element: DevicesTreeItem): vscode.TreeItem {
-    return element;
-  }
-
-  async getChildren(element?: DevicesTreeItem): Promise<DevicesTreeItem[]> {
-    if (!element) {
-      // Return devices at root level, sorted alphabetically by name/address
-      const devices = await this.deviceManager.getDevices();
-      const currentDeviceId = this.deviceManager.getCurrentDeviceId();
-
-      const sortedDevices = [...devices].sort((a, b) => {
-        const nameA = (a.name || a.address).toLowerCase();
-        const nameB = (b.name || b.address).toLowerCase();
-        return nameA.localeCompare(nameB);
-      });
-
-      return sortedDevices.map(
-        (device) => new DeviceTreeItem(device, device.id === currentDeviceId)
-      );
-    }
-
-    if (element instanceof DeviceTreeItem) {
-      // Return apps for this device
-      const deviceAddress = element.device.address;
-
-      // Check cache first
-      let apps = this.appsCache.get(deviceAddress);
-      if (!apps) {
-        try {
-          apps = await this.deviceManager.listApps(deviceAddress);
-          this.appsCache.set(deviceAddress, apps);
-        } catch {
-          apps = [];
-        }
-      }
-
-      // Sort apps alphabetically by name
-      const sortedApps = [...apps].sort((a, b) =>
-        a.name.toLowerCase().localeCompare(b.name.toLowerCase())
-      );
-
-      return sortedApps.map(app => new AppTreeItem(app, deviceAddress));
-    }
-
-    return [];
+    this.contextValue = parts.join("/");
   }
 }
