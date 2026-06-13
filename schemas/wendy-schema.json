@@ -22,8 +22,17 @@
     },
     "platform": {
       "type": "string",
-      "enum": ["wendyos", "wendy-lite"],
-      "description": "Target platform: wendyos (Linux edge devices) or wendy-lite (ESP32 WASM)."
+      "oneOf": [
+        {
+          "enum": ["wendyos", "wendy-lite", "darwin"],
+          "description": "Named target platform: wendyos (Linux edge device running WendyOS), wendy-lite (ESP32 WASM target), or darwin (native macOS app via Wendy Agent for Mac)."
+        },
+        {
+          "pattern": "^linux\\/[a-zA-Z0-9_]+$",
+          "description": "Explicit Linux architecture target, e.g. linux/arm64 or linux/amd64."
+        }
+      ],
+      "description": "Target platform. One of: wendyos (Linux edge device running WendyOS), wendy-lite (ESP32 WASM target), darwin (native macOS app running through Wendy Agent for Mac), or a Linux architecture string such as linux/arm64 or linux/amd64. Omit to target the default platform. If the selected target is Wendy Agent for Mac, wendy run rejects any platform value that does not resolve to darwin."
     },
     "language": {
       "type": "string",
@@ -52,7 +61,7 @@
     },
     "services": {
       "type": "object",
-      "description": "Named services that make up a multi-container app group. Each key is the service name; the value describes how to build and configure that service.",
+      "description": "Named services that make up a multi-container app group. Each key is the service name; the value describes how to build and configure that service. Note: multi-service wendy.json configs are not supported when the selected target is Wendy Agent for Mac.",
       "additionalProperties": {
         "$ref": "#/$defs/serviceDefinition"
       }
