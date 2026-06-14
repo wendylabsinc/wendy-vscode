@@ -122,7 +122,14 @@ export class DeviceManager implements vscode.Disposable {
   private deviceIdsCheckedForUpdates: Set<string> = new Set();
   private currentDevice: Device | undefined;
   private lanDeviceDetails: Map<string, LANDevice> = new Map();
-  private discoveryTimer: ReturnType<typeof setTimeout> | undefined;
+  // Discovery is split into a fast loop (LAN — real edge devices, ~1s) and a
+  // slow loop (Bluetooth + external providers, which take several seconds and
+  // change rarely) so LAN devices appear quickly instead of waiting for the
+  // full all-types scan. Results are cached per loop and merged on rebuild.
+  private fastDiscoveryTimer: ReturnType<typeof setTimeout> | undefined;
+  private slowDiscoveryTimer: ReturnType<typeof setTimeout> | undefined;
+  private fastDiscoveredDevices: Device[] = [];
+  private slowDiscoveredDevices: Device[] = [];
   private disposed: boolean = false;
   readonly onDevicesChanged = this._onDevicesChanged.event;
 
@@ -152,7 +159,12 @@ export class DeviceManager implements vscode.Disposable {
 
   /**
    * Start periodic device discovery using `wendy discover --json`.
-   * Runs a discovery scan, processes results, then schedules the next scan.
+   *
+   * Two independent loops run concurrently so the common case is fast: a
+   * fast loop scans LAN (real edge devices, ~1s) and a slow loop scans
+   * Bluetooth + external providers (several seconds, and they change rarely).
+   * Each loop caches its own results; the merged list is rebuilt and emitted
+   * after every scan, so LAN devices show up without waiting on Bluetooth.
    */
   async startDiscovery(): Promise<void> {
     this.stopDiscovery();
@@ -162,70 +174,132 @@ export class DeviceManager implements vscode.Disposable {
       return;
     }
 
-    execFile(cli.path, ['discover', '--json'], (error, stdout, stderr) => {
-      if (stderr) {
-        console.error('Device discovery stderr:', stderr);
-      }
+    void this.runFastDiscovery(cli);
+    void this.runSlowDiscovery(cli);
+  }
 
-      if (!error && stdout.trim()) {
-        try {
-          const deviceList: DeviceList = JSON.parse(stdout);
-          this.processDeviceList(deviceList);
-        } catch (e) {
-          console.error('Failed to parse device discovery output:', e);
+  private async runFastDiscovery(cli: WendyCLI): Promise<void> {
+    const list = await this.scanType(cli, "lan", "1s");
+    if (list) {
+      const nextLanDeviceDetails = new Map<string, LANDevice>();
+      const devices: Device[] = [];
+      for (const lanDevice of list.lanDevices || []) {
+        nextLanDeviceDetails.set(lanDevice.id, lanDevice);
+        const device = new Device(
+          lanDevice.id,
+          lanDevice.hostname,
+          lanDevice.displayName,
+          lanDevice.agentVersion,
+          "LAN"
+        );
+        if (lanDevice.deviceType) {
+          device.deviceType = lanDevice.deviceType;
         }
+        devices.push(device);
       }
+      this.lanDeviceDetails = nextLanDeviceDetails;
+      this.fastDiscoveredDevices = devices;
+      this.rebuildDevices();
+    }
 
-      if (!this.disposed) {
-        this.discoveryTimer = setTimeout(() => this.startDiscovery(), 5000);
+    if (!this.disposed) {
+      this.fastDiscoveryTimer = setTimeout(
+        () => void this.runFastDiscovery(cli),
+        2000
+      );
+    }
+  }
+
+  private async runSlowDiscovery(cli: WendyCLI): Promise<void> {
+    const [bluetooth, external] = await Promise.all([
+      this.scanType(cli, "bluetooth", "5s"),
+      this.scanType(cli, "external", "2s"),
+    ]);
+
+    if (bluetooth || external) {
+      const devices: Device[] = [];
+      for (const btDevice of bluetooth?.bluetoothDevices || []) {
+        devices.push(new Device(
+          btDevice.id,
+          btDevice.address,
+          btDevice.displayName,
+          btDevice.agentVersion,
+          "BLE"
+        ));
       }
+      for (const externalDevice of external?.externalDevices || []) {
+        const connectionType = this.connectionTypeForExternalDevice(externalDevice);
+        devices.push(new Device(
+          externalDevice.id,
+          externalDevice.id,
+          externalDevice.displayName,
+          externalDevice.agentVersion,
+          connectionType
+        ));
+      }
+      this.slowDiscoveredDevices = devices;
+      this.rebuildDevices();
+    }
+
+    if (!this.disposed) {
+      this.slowDiscoveryTimer = setTimeout(
+        () => void this.runSlowDiscovery(cli),
+        10000
+      );
+    }
+  }
+
+  /**
+   * Runs a single `wendy discover` scan for one device type and returns the
+   * parsed result, or null if the scan failed or produced no usable output.
+   */
+  private scanType(
+    cli: WendyCLI,
+    type: string,
+    timeout: string
+  ): Promise<DeviceList | null> {
+    return new Promise((resolve) => {
+      execFile(
+        cli.path,
+        ["discover", "--json", "--type", type, "--timeout", timeout],
+        (error, stdout, stderr) => {
+          if (stderr) {
+            console.error(`Device discovery (${type}) stderr:`, stderr);
+          }
+          if (!error && stdout.trim()) {
+            try {
+              resolve(JSON.parse(stdout) as DeviceList);
+              return;
+            } catch (e) {
+              console.error(`Failed to parse ${type} discovery output:`, e);
+            }
+          }
+          resolve(null);
+        }
+      );
     });
   }
 
-  private processDeviceList(deviceList: DeviceList): void {
-    const manualDevices = this.getManualDevices();
-    const nextLanDeviceDetails = new Map<string, LANDevice>();
-    let foundDevices: Device[] = [];
-
-    for (const lanDevice of deviceList.lanDevices || []) {
-      nextLanDeviceDetails.set(lanDevice.id, lanDevice);
-      const device = new Device(
-        lanDevice.id,
-        lanDevice.hostname,
-        lanDevice.displayName,
-        lanDevice.agentVersion,
-        "LAN"
-      );
-      if (lanDevice.deviceType) {
-        device.deviceType = lanDevice.deviceType;
+  /**
+   * Merges the fast (LAN) and slow (Bluetooth/external) discovery caches with
+   * manually configured devices, de-duplicating by id, and notifies listeners.
+   */
+  private rebuildDevices(): void {
+    const merged: Device[] = [];
+    const seen = new Set<string>();
+    for (const device of [
+      ...this.fastDiscoveredDevices,
+      ...this.slowDiscoveredDevices,
+      ...this.getManualDevices(),
+    ]) {
+      if (seen.has(device.id)) {
+        continue;
       }
-      foundDevices.push(device);
+      seen.add(device.id);
+      merged.push(device);
     }
+    this.devices = merged;
 
-    for (const btDevice of deviceList.bluetoothDevices || []) {
-      foundDevices.push(new Device(
-        btDevice.id,
-        btDevice.address,
-        btDevice.displayName,
-        btDevice.agentVersion,
-        "BLE"
-      ));
-    }
-
-    for (const externalDevice of deviceList.externalDevices || []) {
-      const connectionType = this.connectionTypeForExternalDevice(externalDevice);
-      foundDevices.push(new Device(
-        externalDevice.id,
-        externalDevice.id,
-        externalDevice.displayName,
-        externalDevice.agentVersion,
-        connectionType
-      ));
-    }
-
-    const devices = [...foundDevices, ...manualDevices];
-    this.lanDeviceDetails = nextLanDeviceDetails;
-    this.devices = devices;
     const currentDevice = this.getCurrentDevice();
     if (currentDevice) {
       this.checkForUpdates(currentDevice).catch((error) => {
@@ -244,9 +318,13 @@ export class DeviceManager implements vscode.Disposable {
   }
 
   stopDiscovery(): void {
-    if (this.discoveryTimer) {
-      clearTimeout(this.discoveryTimer);
-      this.discoveryTimer = undefined;
+    if (this.fastDiscoveryTimer) {
+      clearTimeout(this.fastDiscoveryTimer);
+      this.fastDiscoveryTimer = undefined;
+    }
+    if (this.slowDiscoveryTimer) {
+      clearTimeout(this.slowDiscoveryTimer);
+      this.slowDiscoveryTimer = undefined;
     }
   }
 
