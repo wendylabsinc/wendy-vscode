@@ -423,6 +423,55 @@ export async function activate(
       ),
 
       vscode.commands.registerCommand(
+        "wendyDevices.unenrollDevice",
+        async (item: DeviceTreeItem | undefined) => {
+          if (!item?.device) {
+            return;
+          }
+
+          const device = item.device;
+          const confirmed = await vscode.window.showWarningMessage(
+            `Unenroll "${device.name}" (${device.address})?\n\nThis resets the device to an unprovisioned state and deletes its asset record from Wendy Cloud. This action cannot be undone.`,
+            { modal: true },
+            "Unenroll"
+          );
+
+          if (confirmed !== "Unenroll") {
+            return;
+          }
+
+          const cli = await WendyCLI.create();
+          if (!cli) {
+            vscode.window.showErrorMessage(
+              "Wendy CLI is not available. Please check your installation."
+            );
+            return;
+          }
+
+          await vscode.window.withProgress(
+            {
+              location: vscode.ProgressLocation.Notification,
+              title: `Unenrolling device "${device.name}"…`,
+              cancellable: false,
+            },
+            async () => {
+              try {
+                await cli.unenrollDevice(device.address);
+                vscode.window.showInformationMessage(
+                  `Device "${device.name}" has been unenrolled and its cloud asset removed.`
+                );
+                devicesProvider.refresh();
+              } catch (error) {
+                vscode.window.showErrorMessage(
+                  `Failed to unenroll device "${device.name}": ${getErrorDescription(error)}`
+                );
+              }
+            }
+          );
+        }
+      ),
+
+      vscode.commands.registerCommand(
         "wendyDevices.connectWifi",
         async (item) => {
           if (item?.device) {
