@@ -8,11 +8,13 @@ export interface OsCacheEntry {
   size: string;
 }
 
+type OsCacheTreeItem = OsCacheItem | OsCacheEmptyItem;
+
 export class OperatingSystemCacheProvider
-  implements vscode.TreeDataProvider<OsCacheItem>
+  implements vscode.TreeDataProvider<OsCacheTreeItem>
 {
   private _onDidChangeTreeData = new vscode.EventEmitter<
-    OsCacheItem | undefined | void
+    OsCacheTreeItem | undefined | void
   >();
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 
@@ -22,11 +24,11 @@ export class OperatingSystemCacheProvider
     this._onDidChangeTreeData.fire();
   }
 
-  getTreeItem(element: OsCacheItem): vscode.TreeItem {
+  getTreeItem(element: OsCacheTreeItem): vscode.TreeItem {
     return element;
   }
 
-  async getChildren(element?: OsCacheItem): Promise<OsCacheItem[]> {
+  async getChildren(element?: OsCacheTreeItem): Promise<OsCacheTreeItem[]> {
     if (element) {
       return [];
     }
