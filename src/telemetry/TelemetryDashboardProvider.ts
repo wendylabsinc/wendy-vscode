@@ -12,6 +12,7 @@ export interface TelemetryLog {
   body: string;
   attributes?: Record<string, string>;
   resource?: Record<string, string>;
+  isHistory?: boolean;
 }
 
 export interface TelemetryMetric {
@@ -23,6 +24,7 @@ export interface TelemetryMetric {
   metricType: string;
   unit?: string;
   attributes?: Record<string, string>;
+  isHistory?: boolean;
 }
 
 export interface TelemetrySpan {
@@ -45,6 +47,7 @@ export interface TelemetrySpan {
   events?: Array<{ name: string; timestamp: string; timestampNano?: number }>;
   attributes?: Record<string, string>;
   resource?: Record<string, string>;
+  isHistory?: boolean;
 }
 
 export interface TelemetryError {
@@ -61,12 +64,15 @@ export class TelemetryDashboardProvider implements vscode.Disposable {
   private deviceAddress: string;
   private disposables: vscode.Disposable[] = [];
   private buffer: string = "";
+  private tailN: number | undefined;
 
   constructor(
     private readonly extensionUri: vscode.Uri,
-    deviceAddress: string
+    deviceAddress: string,
+    tailN?: number
   ) {
     this.deviceAddress = deviceAddress;
+    this.tailN = tailN;
   }
 
   async show(): Promise<void> {
@@ -125,14 +131,20 @@ export class TelemetryDashboardProvider implements vscode.Disposable {
     // Stop any existing stream
     this.stopStream();
 
-    // Start the telemetry stream
-    this.process = spawn(cli.path, [
+    const args = [
       "device", "telemetry-stream",
       "--device", this.deviceAddress,
       "--logs",
       "--metrics",
       "--traces"
-    ]);
+    ];
+
+    if (this.tailN !== undefined && this.tailN > 0) {
+      args.push("--tail", String(this.tailN));
+    }
+
+    // Start the telemetry stream
+    this.process = spawn(cli.path, args);
 
     this.buffer = "";
 
@@ -163,6 +175,12 @@ export class TelemetryDashboardProvider implements vscode.Disposable {
 
     for (const line of lines) {
       if (line.trim()) {
+        // Detect the live separator printed by the CLI when transitioning
+        // from history replay to live streaming.
+        if (/─+\s*live\s*─+/i.test(line)) {
+          this.sendLiveSeparator();
+          continue;
+        }
         try {
           const data = JSON.parse(line) as TelemetryData;
           this.sendTelemetryData(data);
@@ -182,6 +200,10 @@ export class TelemetryDashboardProvider implements vscode.Disposable {
 
   private sendTelemetryData(data: TelemetryData): void {
     this.panel?.webview.postMessage({ type: "telemetry", data });
+  }
+
+  private sendLiveSeparator(): void {
+    this.panel?.webview.postMessage({ type: "liveSeparator" });
   }
 
   private sendError(message: string): void {
@@ -357,6 +379,12 @@ export class TelemetryDashboardProvider implements vscode.Disposable {
       background: var(--vscode-list-hoverBackground, rgba(255,255,255,0.04));
     }
 
+    /* History entries are visually dimmed */
+    .log-entry.history {
+      opacity: 0.55;
+      font-style: italic;
+    }
+
     .log-timestamp {
       color: var(--vscode-descriptionForeground, #888);
       white-space: nowrap;
@@ -397,6 +425,32 @@ export class TelemetryDashboardProvider implements vscode.Disposable {
       margin-left: 8px;
     }
 
+    /* Live separator */
+    .live-separator {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 4px;
+      color: var(--vscode-descriptionForeground, #888);
+      font-size: 11px;
+      user-select: none;
+    }
+
+    .live-separator::before,
+    .live-separator::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border-color);
+    }
+
+    .live-separator-label {
+      padding: 0 8px;
+      color: var(--log-debug);
+      font-weight: 600;
+      letter-spacing: 0.05em;
+    }
+
     /* Metrics Panel */
     .metrics-container {
       flex: 1;
@@ -420,6 +474,11 @@ export class TelemetryDashboardProvider implements vscode.Disposable {
 
     .metric-card:hover {
       border-color: var(--vscode-focusBorder, #007fd4);
+    }
+
+    /* History metric cards are dimmed until first live update */
+    .metric-card.history {
+      opacity: 0.55;
     }
 
     .metric-header {
@@ -544,6 +603,11 @@ export class TelemetryDashboardProvider implements vscode.Disposable {
       border-radius: 4px;
       margin-bottom: 8px;
       background: var(--header-bg);
+    }
+
+    /* History trace entries are dimmed */
+    .trace-entry.history {
+      opacity: 0.55;
     }
 
     .trace-header {
@@ -743,12 +807,16 @@ export class TelemetryDashboardProvider implements vscode.Disposable {
     // State
     let isPaused = false;
     let logs = [];
-    let metrics = new Map(); // name -> { data: TelemetryMetric, history: number[] }
+    let metrics = new Map(); // name -> { data: TelemetryMetric, history: number[], isHistory: boolean }
     let traces = []; // Array of spans
     let services = new Set();
     const maxLogs = 1000;
     const maxTraces = 500;
     const maxHistory = 50;
+
+    // Track whether we have seen a live record yet (for separator insertion).
+    let logLiveSeparatorInserted = false;
+    let traceLiveSeparatorInserted = false;
 
     // Severity levels (higher = more severe)
     const severityLevels = {
@@ -805,6 +873,8 @@ export class TelemetryDashboardProvider implements vscode.Disposable {
       logsContainer.innerHTML = '';
       metricsGrid.innerHTML = '';
       tracesContainer.innerHTML = '';
+      logLiveSeparatorInserted = false;
+      traceLiveSeparatorInserted = false;
       updateServiceFilter();
       updateStats();
     });
@@ -875,9 +945,16 @@ export class TelemetryDashboardProvider implements vscode.Disposable {
       const fragment = document.createDocumentFragment();
       const filteredLogs = logs.filter(shouldShowLog);
 
+      let lastWasHistory = null;
       filteredLogs.forEach(log => {
+        // Insert separator when transitioning from history to live in a full re-render
+        if (lastWasHistory === true && !log.isHistory) {
+          fragment.appendChild(makeLiveSeparator());
+        }
+        lastWasHistory = !!log.isHistory;
+
         const entry = document.createElement('div');
-        entry.className = 'log-entry';
+        entry.className = 'log-entry' + (log.isHistory ? ' history' : '');
 
         const severityClass = getSeverityClass(log.severity);
         const attrs = log.attributes ? Object.entries(log.attributes)
@@ -902,6 +979,13 @@ export class TelemetryDashboardProvider implements vscode.Disposable {
       if (!isPaused) {
         logsContainer.scrollTop = logsContainer.scrollHeight;
       }
+    }
+
+    function makeLiveSeparator() {
+      const sep = document.createElement('div');
+      sep.className = 'live-separator';
+      sep.innerHTML = '<span class="live-separator-label">live</span>';
+      return sep;
     }
 
     function escapeHtml(text) {
@@ -982,9 +1066,9 @@ export class TelemetryDashboardProvider implements vscode.Disposable {
 
       const sortedMetrics = Array.from(metrics.entries()).sort((a, b) => a[0].localeCompare(b[0]));
 
-      sortedMetrics.forEach(([name, { data, history }]) => {
+      sortedMetrics.forEach(([name, { data, history, isHistoryEntry }]) => {
         const card = document.createElement('div');
-        card.className = 'metric-card';
+        card.className = 'metric-card' + (isHistoryEntry ? ' history' : '');
         card.dataset.name = name;
 
         const formattedValue = formatMetricValue(data.value, data.unit);
@@ -1013,13 +1097,17 @@ export class TelemetryDashboardProvider implements vscode.Disposable {
 
       if (!metricData) return;
 
-      const { data, history } = metricData;
+      const { data, history, isHistoryEntry } = metricData;
       const formattedValue = formatMetricValue(data.value, data.unit);
       const displayUnit = data.unit && !formattedValue.includes(data.unit) ? data.unit : '';
 
       if (existing) {
         existing.querySelector('.metric-value').innerHTML = \`\${formattedValue}<span class="metric-unit">\${displayUnit}</span>\`;
         existing.querySelector('.metric-sparkline').innerHTML = createSparkline(history);
+        // Remove the history dimming once a live update arrives for this metric
+        if (!isHistoryEntry) {
+          existing.classList.remove('history');
+        }
       } else {
         renderMetrics();
       }
@@ -1043,7 +1131,7 @@ export class TelemetryDashboardProvider implements vscode.Disposable {
 
     function renderTraceEntry(span) {
       const entry = document.createElement('div');
-      entry.className = 'trace-entry';
+      entry.className = 'trace-entry' + (span.isHistory ? ' history' : '');
       entry.dataset.spanId = span.spanId;
 
       // Handle status as object with code property
@@ -1111,6 +1199,22 @@ export class TelemetryDashboardProvider implements vscode.Disposable {
     window.addEventListener('message', event => {
       const message = event.data;
 
+      if (message.type === 'liveSeparator') {
+        // Insert separator in logs panel
+        if (!logLiveSeparatorInserted) {
+          logLiveSeparatorInserted = true;
+          logsContainer.appendChild(makeLiveSeparator());
+          logsContainer.scrollTop = logsContainer.scrollHeight;
+        }
+        // Insert separator in traces panel
+        if (!traceLiveSeparatorInserted) {
+          traceLiveSeparatorInserted = true;
+          // Traces are prepended (newest first), so insert at the top
+          tracesContainer.insertBefore(makeLiveSeparator(), tracesContainer.firstChild);
+        }
+        return;
+      }
+
       if (message.type === 'telemetry') {
         const data = message.data;
 
@@ -1119,6 +1223,16 @@ export class TelemetryDashboardProvider implements vscode.Disposable {
           if (data.service && !services.has(data.service)) {
             services.add(data.service);
             updateServiceFilter();
+          }
+
+          // When a live record arrives and we haven't inserted the separator yet,
+          // insert it now (handles the case where the CLI doesn't print a separator
+          // line but the JSON records carry is_history=false after history records).
+          if (!data.isHistory && !logLiveSeparatorInserted && logs.some(l => l.isHistory)) {
+            logLiveSeparatorInserted = true;
+            if (!isPaused) {
+              logsContainer.appendChild(makeLiveSeparator());
+            }
           }
 
           // Add log
@@ -1130,7 +1244,7 @@ export class TelemetryDashboardProvider implements vscode.Disposable {
           // Render if visible and matches filter
           if (!isPaused && shouldShowLog(data)) {
             const entry = document.createElement('div');
-            entry.className = 'log-entry';
+            entry.className = 'log-entry' + (data.isHistory ? ' history' : '');
 
             const severityClass = getSeverityClass(data.severity);
             const attrs = data.attributes ? Object.entries(data.attributes)
@@ -1161,6 +1275,7 @@ export class TelemetryDashboardProvider implements vscode.Disposable {
         if (data.type === 'metric') {
           const key = data.name;
           const existing = metrics.get(key);
+          const isHistoryEntry = !!data.isHistory;
 
           if (existing) {
             existing.data = data;
@@ -1168,10 +1283,15 @@ export class TelemetryDashboardProvider implements vscode.Disposable {
             if (existing.history.length > maxHistory) {
               existing.history.shift();
             }
+            // Once a live value arrives, mark the entry as live
+            if (!isHistoryEntry) {
+              existing.isHistoryEntry = false;
+            }
           } else {
             metrics.set(key, {
               data: data,
-              history: [data.value]
+              history: [data.value],
+              isHistoryEntry
             });
           }
 
@@ -1184,6 +1304,14 @@ export class TelemetryDashboardProvider implements vscode.Disposable {
           if (data.service && !services.has(data.service)) {
             services.add(data.service);
             updateServiceFilter();
+          }
+
+          // Insert separator when first live trace arrives after history traces
+          if (!data.isHistory && !traceLiveSeparatorInserted && traces.some(t => t.isHistory)) {
+            traceLiveSeparatorInserted = true;
+            if (!isPaused) {
+              tracesContainer.insertBefore(makeLiveSeparator(), tracesContainer.firstChild);
+            }
           }
 
           // Add trace
