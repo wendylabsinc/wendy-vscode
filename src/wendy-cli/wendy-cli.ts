@@ -100,6 +100,26 @@ export class WendyCLI {
   public async getJsonSchema(): Promise<string> {
     return await this.exec(["json", "schema"]);
   }
+
+  /**
+   * Unenrolls a device, resetting it to an unprovisioned state and removing
+   * its asset record from Wendy Cloud. Passes `--yes` to skip the interactive
+   * confirmation prompt (confirmation is handled by the VS Code UI before
+   * this method is called). Optionally overrides the cloud gRPC endpoint.
+   *
+   * @param deviceAddress Address (hostname or hostname:port) of the device to unenroll.
+   * @param cloudGRPC Optional cloud gRPC endpoint override.
+   */
+  public async unenrollDevice(
+    deviceAddress: string,
+    cloudGRPC?: string
+  ): Promise<void> {
+    const args = ["device", "unenroll", "--agent", deviceAddress, "--yes"];
+    if (cloudGRPC && cloudGRPC.trim() !== "") {
+      args.push("--cloud-grpc", cloudGRPC.trim());
+    }
+    await this.exec(args);
+  }
 }
 
 export interface WendyInfo {

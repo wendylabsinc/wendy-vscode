@@ -160,6 +160,11 @@
         "category": "Wendy"
       },
       {
+        "command": "wendyDevices.unenrollDevice",
+        "title": "Unenroll Device",
+        "category": "Wendy"
+      },
+      {
         "command": "wendyApps.showLogs",
         "title": "Show Logs",
         "category": "Wendy"
@@ -306,6 +311,11 @@
           "command": "wendyDevices.deviceSetup",
           "when": "view == wendyDevices && viewItem =~ /device/ && viewItem =~ /LAN/",
           "group": "device@1"
+        },
+        {
+          "command": "wendyDevices.unenrollDevice",
+          "when": "view == wendyDevices && viewItem =~ /device/ && viewItem =~ /LAN/",
+          "group": "device@2"
         },
         {
           "command": "wendyApps.showLogs",
