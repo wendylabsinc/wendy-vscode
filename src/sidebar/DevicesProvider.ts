@@ -7,6 +7,7 @@ function formatDeviceType(raw: string): string {
   if (s.startsWith("raspberrypi5")) { return "Raspberry Pi 5"; }
   if (s.startsWith("raspberrypi4")) { return "Raspberry Pi 4"; }
   if (s.startsWith("raspberrypi3")) { return "Raspberry Pi 3"; }
+  if (s.startsWith("jetson-agx-thor")) { return "Jetson AGX Thor"; }
   if (s.startsWith("jetson-agx-orin")) { return "Jetson AGX Orin"; }
   if (s.startsWith("jetson-orin-nx")) { return "Jetson Orin NX"; }
   if (s.startsWith("jetson-orin-nano")) { return "Jetson Orin Nano"; }
