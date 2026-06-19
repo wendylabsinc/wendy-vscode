@@ -36,6 +36,21 @@
       "default": false,
       "description": "Enable debug mode."
     },
+    "isolation": {
+      "type": "string",
+      "enum": ["shared-network", "shared-ipc"],
+      "description": "Namespace isolation mode for multi-service apps. \"shared-network\" shares only the network namespace (DDS multicast discovery). \"shared-ipc\" shares the network namespace, IPC namespace, and /dev/shm — required for ROS 2 zero-copy shared-memory transport (CycloneDDS iceoryx)."
+    },
+    "frameworks": {
+      "$ref": "#/$defs/frameworks"
+    },
+    "services": {
+      "type": "object",
+      "description": "Per-service configuration. Keys are service names; values are service config objects that may include their own `frameworks` overrides.",
+      "additionalProperties": {
+        "$ref": "#/$defs/serviceConfig"
+      }
+    },
     "entitlements": {
       "type": "array",
       "description": "Capabilities the app requires (GPU, network, Bluetooth, etc.).",
@@ -64,6 +79,72 @@
     }
   },
   "$defs": {
+    "frameworks": {
+      "type": "object",
+      "description": "Framework-specific configuration injected into containers at runtime.",
+      "additionalProperties": false,
+      "properties": {
+        "ros2": {
+          "$ref": "#/$defs/ros2Config"
+        }
+      }
+    },
+    "ros2Config": {
+      "type": "object",
+      "description": "ROS 2 framework configuration. Wendy injects ROS_DOMAIN_ID, RMW_IMPLEMENTATION, and (when using CycloneDDS with shared-ipc isolation) CYCLONEDDS_URI and ROS_LOCALHOST_ONLY automatically.",
+      "additionalProperties": false,
+      "properties": {
+        "domainId": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 101,
+          "description": "ROS_DOMAIN_ID to inject. When omitted, Wendy assigns a stable ID derived from the appId (FNV hash mod 101) so the domain is consistent across restarts."
+        },
+        "distro": {
+          "type": "string",
+          "enum": ["humble", "iron", "jazzy", "rolling"],
+          "default": "humble",
+          "description": "ROS 2 distribution. Used by the Wendy agent to select the CLI sidecar image for `wendy device ros2` inspection commands. Defaults to \"humble\"."
+        },
+        "rmw": {
+          "type": "string",
+          "enum": [
+            "cyclonedds",
+            "fastrtps",
+            "fastdds",
+            "connextdds",
+            "gurumdds",
+            "rmw_cyclonedds_cpp",
+            "rmw_fastrtps_cpp",
+            "rmw_fastrtps_dynamic_cpp",
+            "rmw_connextdds",
+            "rmw_gurumdds_cpp"
+          ],
+          "default": "cyclonedds",
+          "description": "RMW implementation to inject as RMW_IMPLEMENTATION. Accepts short names (e.g. \"cyclonedds\") or full identifiers (e.g. \"rmw_cyclonedds_cpp\"). Defaults to rmw_cyclonedds_cpp."
+        }
+      }
+    },
+    "serviceConfig": {
+      "type": "object",
+      "description": "Per-service configuration overrides. A service-level `frameworks.ros2` block takes precedence over the app-level block.",
+      "additionalProperties": false,
+      "properties": {
+        "frameworks": {
+          "$ref": "#/$defs/frameworks"
+        },
+        "entitlements": {
+          "type": "array",
+          "description": "Service-level entitlements.",
+          "items": {
+            "$ref": "#/$defs/entitlement"
+          }
+        },
+        "run": {
+          "$ref": "#/$defs/run"
+        }
+      }
+    },
     "entitlement": {
       "type": "object",
       "required": ["type"],
