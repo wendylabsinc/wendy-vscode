@@ -89,6 +89,11 @@ export interface DeviceInfo {
   currentVersion: string;
   latestVersion: string | undefined;
   deviceType?: string;
+  /**
+   * GPU architecture identifier (e.g. "sm_87" for NVIDIA Ampere).
+   * Vendor-specific format. Present only when the device has a detected GPU.
+   */
+  gpuArch?: string;
 }
 
 export interface WifiConnectionResult {
@@ -382,10 +387,20 @@ export class DeviceManager implements vscode.Disposable {
     });
 
     const info: DeviceInfo = JSON.parse(output);
+    let changed = false;
+
     if (info.deviceType) {
       device.deviceType = info.deviceType;
+      changed = true;
+    }
+    if (info.gpuArch) {
+      device.gpuArch = info.gpuArch;
+      changed = true;
+    }
+    if (changed) {
       this._onDevicesChanged.fire();
     }
+
     if (info.latestVersion) {
       const confirmed = await vscode.window.showInformationMessage(
         `Update available for ${device.name}: ${info.latestVersion}`,
