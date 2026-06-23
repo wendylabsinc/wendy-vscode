@@ -8,6 +8,12 @@ export class Device {
    */
   public deviceType: string | undefined;
 
+  /**
+   * GPU architecture identifier reported by `wendy device info` (e.g. "sm_87" for NVIDIA Ampere).
+   * Vendor-specific format. Populated asynchronously after the device is discovered.
+   */
+  public gpuArch: string | undefined;
+
   constructor(
     /**
      * Unique identifier for the device
