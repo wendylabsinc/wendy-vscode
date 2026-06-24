@@ -24,8 +24,17 @@
     },
     "platform": {
       "type": "string",
-      "enum": ["wendyos", "wendy-lite", "darwin"],
-      "description": "Target platform: wendyos (Linux edge devices), wendy-lite (ESP32 WASM), or darwin (native macOS via Wendy Agent for Mac)."
+      "enum": [
+        "linux",
+        "wendyos",
+        "wendy-lite",
+        "darwin",
+        "linux/arm64",
+        "linux/amd64",
+        "linux/arm/v7",
+        "linux/arm/v6"
+      ],
+      "description": "Target platform. Use \"linux\" for WendyOS/Linux container targets (device architecture is inferred). \"wendyos\" is a compatibility alias for \"linux\". \"wendy-lite\" targets ESP32 WASM. \"darwin\" targets native macOS apps running through Wendy for Mac. Explicit architecture strings such as \"linux/arm64\" or \"linux/amd64\" are also accepted."
     },
     "language": {
       "type": "string",
