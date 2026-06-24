@@ -36,6 +36,12 @@
       "default": false,
       "description": "Enable debug mode."
     },
+    "brewfile": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?:\\./)?(?!/)(?!.*[\\\\%\\u0000-\\u001F])(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*(?:/)\\.(?:/|$))(?!.*//)(?!.*/$).+$",
+      "description": "Optional Homebrew Bundle manifest for native Darwin (platform: \"darwin\") deployments. The path is relative to wendy.json; absolute paths and '..' components are not allowed. If omitted, a project-root Brewfile.wendy is auto-detected for native SwiftPM and Xcode Mac runs. The CLI syncs the Brewfile to the target Mac and Wendy Agent runs `brew bundle --file <synced Brewfile>` before starting the app. Homebrew must already be installed on the target Mac. Linux/WendyOS container deployments ignore this field."
+    },
     "isolation": {
       "type": "string",
       "enum": ["shared-network", "shared-ipc"],
