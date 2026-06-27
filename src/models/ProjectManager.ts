@@ -30,6 +30,36 @@ export interface BuildProjectOptions {
   executable?: string;
 }
 
+export type OptimizeSeverity = "info" | "warning" | "error";
+
+export interface OptimizeProjectOptions {
+  /** Apply safe, deterministic fixes (cache mount, .dockerignore, release flag). */
+  fix?: boolean;
+  /** Emit a schema-versioned agent context bundle instead of a findings report. */
+  agentic?: boolean;
+  /** Force JSON output regardless of TTY state. */
+  json?: boolean;
+  /** Minimum severity that triggers a non-zero exit code. Defaults to "warning". */
+  severity?: OptimizeSeverity;
+  /** Target architecture override. Defaults to arm64 in the CLI. */
+  arch?: string;
+}
+
+export interface OptimizeFinding {
+  analyzer: string;
+  severity: string;
+  title: string;
+  detail?: string;
+  target?: string;
+  location?: { file: string; line: number };
+  fixable?: boolean;
+}
+
+export interface OptimizeReport {
+  targets: unknown[];
+  findings: OptimizeFinding[];
+}
+
 /**
  * Manages Wendy project operations
  */
@@ -125,6 +155,76 @@ export class ProjectManager {
         this.outputChannel.appendLine(stdout);
         resolve();
       });
+    });
+  }
+
+  /**
+   * Run `wendy project optimize` against the given project directory.
+   *
+   * Returns the raw CLI output (human-readable text or JSON depending on
+   * `options.json`). The caller is responsible for surfacing it to the user.
+   *
+   * Throws when the CLI exits with code 2 (error). Exit code 1 (findings
+   * above the severity threshold) is not thrown — the findings are returned
+   * in the output string so the caller can display them.
+   */
+  async optimizeProject(
+    projectPath: string,
+    options: OptimizeProjectOptions = {}
+  ): Promise<string> {
+    const cli = await WendyCLI.create();
+    if (!cli) {
+      throw new Error("Wendy CLI not found");
+    }
+
+    const args: string[] = ['project', 'optimize'];
+
+    // Always request JSON output from the extension so we can parse / display
+    // findings in a structured way inside VS Code.
+    args.push('--json');
+
+    if (options.fix) {
+      args.push('--fix');
+    }
+    if (options.agentic) {
+      args.push('--agentic');
+    }
+    if (options.severity) {
+      args.push('--severity', options.severity);
+    }
+    if (options.arch) {
+      args.push('--arch', options.arch);
+    }
+
+    this.outputChannel.appendLine(`Executing: ${cli.path} ${args.join(' ')}`);
+
+    return new Promise((resolve, reject) => {
+      execFile(
+        cli.path,
+        args,
+        { cwd: projectPath },
+        (error, stdout, stderr) => {
+          // Exit code 1 means findings were found above the severity threshold.
+          // We still want to surface the output, so only reject on a hard error
+          // (exit code 2 or a spawn error with no stdout).
+          if (error) {
+            const code = (error as NodeJS.ErrnoException & { code?: number }).code;
+            // execFile sets error.code to the exit code for non-zero exits.
+            if (typeof code === 'number' && code === 1 && stdout) {
+              // Findings present — resolve so the caller can display them.
+              this.outputChannel.appendLine(stdout);
+              resolve(stdout);
+              return;
+            }
+            const msg = stderr || error.message;
+            this.outputChannel.appendLine(`Error: ${msg}`);
+            reject(new Error(msg));
+            return;
+          }
+          this.outputChannel.appendLine(stdout);
+          resolve(stdout);
+        }
+      );
     });
   }
 
