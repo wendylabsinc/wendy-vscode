@@ -1,360 +1,20 @@
 {
-  "name": "wendy-vscode",
-  "displayName": "Wendy",
-  "description": "Build and debug WendyOS applications with Visual Studio Code",
-  "version": "0.1.0",
-  "publisher": "wendylabsinc",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/wendylabsinc/wendy-vscode"
-  },
-  "icon": "resources/icon.png",
+  "name": "wendyos",
+  "displayName": "Wendy for VS Code",
+  "description": "Build, run, and debug applications on WendyOS devices.",
+  "version": "0.0.6",
   "engines": {
     "vscode": "^1.96.0"
   },
   "categories": [
-    "Debuggers"
+    "Other"
   ],
   "activationEvents": [
-    "workspaceContains:Package.swift",
-    "workspaceContains:**/*.py",
-    "onDebug",
-    "onDebugDynamicConfigurations:wendy",
-    "onDebugResolve:wendy"
+    "onStartupFinished"
   ],
   "main": "./dist/extension.js",
-  "extensionDependencies": [
-    "ms-python.debugpy",
-    "swiftlang.swift-vscode"
-  ],
+  "icon": "resources/icon.png",
   "contributes": {
-    "jsonValidation": [
-      {
-        "fileMatch": "wendy.json",
-        "url": "./schemas/wendy-schema.json"
-      }
-    ],
-    "viewsContainers": {
-      "activitybar": [
-        {
-          "id": "wendy-explorer",
-          "title": "Wendy",
-          "icon": "resources/activity_bar_icon_dark.svg",
-          "iconTheme": {
-            "light": "resources/activity_bar_icon_light.svg",
-            "dark": "resources/activity_bar_icon_dark.svg"
-          }
-        }
-      ]
-    },
-    "views": {
-      "wendy-explorer": [
-        {
-          "id": "wendyDevices",
-          "name": "Devices"
-        },
-        {
-          "id": "wendyHardware",
-          "name": "Hardware"
-        },
-        {
-          "id": "wendyDisks",
-          "name": "Disks"
-        }
-      ]
-    },
-    "commands": [
-      {
-        "command": "wendy.initProject",
-        "title": "Initialize New Project",
-        "category": "Wendy"
-      },
-      {
-        "command": "wendy.buildProject",
-        "title": "Build Project",
-        "category": "Wendy"
-      },
-      {
-        "command": "wendy.manageEntitlements",
-        "title": "Manage Entitlements",
-        "category": "Wendy"
-      },
-      {
-        "command": "wendy.analyticsStatus",
-        "title": "Analytics Status",
-        "category": "Wendy"
-      },
-      {
-        "command": "wendyDevices.addDevice",
-        "title": "Add Device",
-        "icon": "$(add)"
-      },
-      {
-        "command": "wendyDevices.refreshDevices",
-        "title": "Refresh Devices",
-        "icon": "$(refresh)"
-      },
-      {
-        "command": "wendyDevices.deleteDevice",
-        "title": "Remove Device",
-        "icon": "$(trash)"
-      },
-      {
-        "command": "wendyDevices.connectWifi",
-        "title": "Connect to WiFi",
-        "icon": "$(link)"
-      },
-      {
-        "command": "wendyDevices.updateAgent",
-        "title": "Update Agent",
-        "icon": "$(sync)"
-      },
-      {
-        "command": "wendyDevices.showInfo",
-        "title": "More Info",
-        "category": "Wendy"
-      },
-      {
-        "command": "wendyDevices.copyHostname",
-        "title": "Copy Hostname",
-        "category": "Wendy"
-      },
-      {
-        "command": "wendyDevices.copyAgentVersion",
-        "title": "Copy Wendy Agent Version",
-        "category": "Wendy"
-      },
-      {
-        "command": "wendyDevices.selectDevice",
-        "title": "Set as Current Device",
-        "icon": "$(check)"
-      },
-      {
-        "command": "wendyDevices.showHardware",
-        "title": "Show Hardware",
-        "category": "Wendy"
-      },
-      {
-        "command": "wendyDevices.deviceSetup",
-        "title": "Device Setup",
-        "category": "Wendy"
-      },
-      {
-        "command": "wendyDevices.wifiStatus",
-        "title": "WiFi Status",
-        "category": "Wendy"
-      },
-      {
-        "command": "wendyDevices.disconnectWifi",
-        "title": "Disconnect WiFi",
-        "category": "Wendy"
-      },
-      {
-        "command": "wendyDevices.showLogs",
-        "title": "Show Logs",
-        "category": "Wendy"
-      },
-      {
-        "command": "wendyDevices.showDashboard",
-        "title": "Show Dashboard",
-        "category": "Wendy"
-      },
-      {
-        "command": "wendyDevices.unenrollDevice",
-        "title": "Unenroll Device",
-        "category": "Wendy"
-      },
-      {
-        "command": "wendyApps.showLogs",
-        "title": "Show Logs",
-        "category": "Wendy"
-      },
-      {
-        "command": "wendyApps.startApp",
-        "title": "Start App",
-        "icon": "$(play)"
-      },
-      {
-        "command": "wendyApps.stopApp",
-        "title": "Stop App",
-        "icon": "$(debug-stop)"
-      },
-      {
-        "command": "wendyApps.removeApp",
-        "title": "Remove App",
-        "icon": "$(trash)"
-      },
-      {
-        "command": "wendyDisks.flashDisk",
-        "title": "Flash Disk",
-        "icon": "$(zap)"
-      },
-      {
-        "command": "wendyDisks.refreshDisks",
-        "title": "Refresh Disks",
-        "icon": "$(refresh)"
-      },
-      {
-        "command": "wendy.refreshDebugConfigurations",
-        "title": "Refresh Debug Configurations",
-        "category": "Wendy"
-      },
-      {
-        "command": "wendy.openEntitlementsEditor",
-        "title": "Open Entitlements Editor",
-        "category": "Wendy",
-        "icon": "$(shield)"
-      },
-      {
-        "command": "wendyHardware.refresh",
-        "title": "Refresh Hardware",
-        "icon": "$(refresh)"
-      },
-      {
-        "command": "wendyHardware.watchCamera",
-        "title": "Watch Camera",
-        "icon": "$(eye)"
-      },
-      {
-        "command": "wendyHardware.listenAudioInput",
-        "title": "Listen",
-        "icon": "$(mic)"
-      }
-    ],
-    "menus": {
-      "editor/title": [
-        {
-          "command": "wendy.openEntitlementsEditor",
-          "when": "resourceFilename == wendy.json",
-          "group": "navigation"
-        }
-      ],
-      "view/title": [
-        {
-          "command": "wendyDevices.addDevice",
-          "when": "view == wendyDevices",
-          "group": "navigation"
-        },
-        {
-          "command": "wendyDevices.refreshDevices",
-          "when": "view == wendyDevices",
-          "group": "navigation"
-        },
-        {
-          "command": "wendyDisks.refreshDisks",
-          "when": "view == wendyDisks",
-          "group": "navigation"
-        },
-        {
-          "command": "wendyHardware.refresh",
-          "when": "view == wendyHardware",
-          "group": "navigation"
-        }
-      ],
-      "view/item/context": [
-        {
-          "command": "wendyDevices.deleteDevice",
-          "when": "view == wendyDevices && viewItem =~ /device/ && viewItem =~ /Custom/",
-          "group": "inline"
-        },
-        {
-          "command": "wendyDevices.updateAgent",
-          "when": "view == wendyDevices && viewItem =~ /device/",
-          "group": "navigation@0"
-        },
-        {
-          "command": "wendyDevices.showInfo",
-          "when": "view == wendyDevices && viewItem =~ /device/ && viewItem =~ /LAN/",
-          "group": "navigation@1"
-        },
-        {
-          "command": "wendyDevices.copyHostname",
-          "when": "view == wendyDevices && viewItem =~ /device/ && viewItem =~ /LAN/",
-          "group": "navigation@2"
-        },
-        {
-          "command": "wendyDevices.copyAgentVersion",
-          "when": "view == wendyDevices && viewItem =~ /device/ && viewItem =~ /LAN/",
-          "group": "navigation@3"
-        },
-        {
-          "command": "wendyDevices.selectDevice",
-          "when": "view == wendyDevices && viewItem =~ /device/ && !(viewItem =~ /current/)",
-          "group": "inline"
-        },
-        {
-          "command": "wendyDevices.wifiStatus",
-          "when": "view == wendyDevices && viewItem =~ /device/ && viewItem =~ /LAN/",
-          "group": "wifi@0"
-        },
-        {
-          "command": "wendyDevices.disconnectWifi",
-          "when": "view == wendyDevices && viewItem =~ /device/ && viewItem =~ /LAN/",
-          "group": "wifi@1"
-        },
-        {
-          "command": "wendyDevices.showLogs",
-          "when": "view == wendyDevices && viewItem =~ /device/",
-          "group": "observability@0"
-        },
-        {
-          "command": "wendyDevices.showDashboard",
-          "when": "view == wendyDevices && viewItem =~ /device/",
-          "group": "observability@1"
-        },
-        {
-          "command": "wendyDevices.showHardware",
-          "when": "view == wendyDevices && viewItem =~ /device/ && viewItem =~ /LAN/",
-          "group": "device@0"
-        },
-        {
-          "command": "wendyDevices.deviceSetup",
-          "when": "view == wendyDevices && viewItem =~ /device/ && viewItem =~ /LAN/",
-          "group": "device@1"
-        },
-        {
-          "command": "wendyDevices.unenrollDevice",
-          "when": "view == wendyDevices && viewItem =~ /device/ && viewItem =~ /LAN/",
-          "group": "device@2"
-        },
-        {
-          "command": "wendyApps.showLogs",
-          "when": "view == wendyDevices && viewItem == app-running",
-          "group": "observability@0"
-        },
-        {
-          "command": "wendyApps.startApp",
-          "when": "view == wendyDevices && viewItem == app-stopped",
-          "group": "inline"
-        },
-        {
-          "command": "wendyApps.stopApp",
-          "when": "view == wendyDevices && viewItem == app-running",
-          "group": "inline"
-        },
-        {
-          "command": "wendyApps.removeApp",
-          "when": "view == wendyDevices && viewItem =~ /^app-/",
-          "group": "inline"
-        },
-        {
-          "command": "wendyDisks.flashDisk",
-          "when": "view == wendyDisks && viewItem == disk",
-          "group": "inline"
-        },
-        {
-          "command": "wendyHardware.watchCamera",
-          "when": "view == wendyHardware && viewItem == hardwareDevice-camera",
-          "group": "inline"
-        },
-        {
-          "command": "wendyHardware.listenAudioInput",
-          "when": "view == wendyHardware && viewItem == hardwareDevice-audio",
-          "group": "inline"
-        }
-      ]
-    },
-    "keybindings": [],
     "configuration": {
       "title": "WendyOS",
       "properties": {
@@ -366,123 +26,136 @@
         "wendyos.devices": {
           "type": "array",
           "default": [],
-          "description": "List of Wendy devices",
-          "items": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "type": "string",
-                "description": "Unique identifier for the device"
-              },
-              "address": {
-                "type": "string",
-                "description": "Device address (hostname or hostname:port)"
-              }
-            }
-          }
+          "description": "List of Wendy devices (managed by the extension)."
         },
         "wendyos.currentDevice": {
           "type": "string",
-          "default": null,
-          "description": "ID of the currently selected Wendy device"
+          "default": "",
+          "description": "ID of the currently selected Wendy device (managed by the extension)."
         }
       }
     },
-    "debuggers": [
-      {
-        "type": "wendy",
-        "label": "WendyOS Debugger",
-        "configurationAttributes": {
-          "attach": {
-            "required": [
-              "target"
-            ],
-            "properties": {
-              "target": {
-                "type": "string",
-                "description": "The target to debug."
-              },
-              "cwd": {
-                "type": "string",
-                "description": "The working directory for the debug session."
-              },
-              "agent": {
-                "type": "string",
-                "description": "The Wendy agent address (hostname:port) to connect to."
-              },
-              "preLaunchTask": {
-                "type": "string",
-                "description": "Task to run before starting the debug session."
-              },
-              "initCommands": {
-                "type": "array",
-                "description": "LLDB commands executed upon debugger startup prior to creating the LLDB target.",
-                "items": {
-                  "type": "string"
-                }
-              },
-              "attachCommands": {
-                "type": "array",
-                "description": "LLDB commands that execute in place of the standard attach mechanism. Used for custom attach scenarios such as remote debugging.",
-                "items": {
-                  "type": "string"
-                }
-              },
-              "preRunCommands": {
-                "type": "array",
-                "description": "LLDB commands executed just before attaching, after the LLDB target has been created.",
-                "items": {
-                  "type": "string"
-                }
-              },
-              "stopCommands": {
-                "type": "array",
-                "description": "LLDB commands executed just after each stop.",
-                "items": {
-                  "type": "string"
-                }
-              },
-              "gdb-remote-hostname": {
-                "type": "string",
-                "description": "Hostname for remote debugging with GDB protocol."
-              },
-              "gdb-remote-port": {
-                "type": "integer",
-                "description": "Port for remote debugging with GDB protocol."
-              }
-            }
-          }
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "wendy",
+          "title": "Wendy",
+          "icon": "resources/activity_bar_icon_dark.svg"
+        }
+      ]
+    },
+    "views": {
+      "wendy": [
+        {
+          "id": "wendyDevices",
+          "name": "Devices"
         },
-        "initialConfigurations": [
-          {
-            "type": "wendy",
-            "request": "attach",
-            "name": "Debug Wendy Application",
-            "target": "${workspaceFolderBasename}",
-            "cwd": "${workspaceFolder}"
-          }
-        ]
+        {
+          "id": "wendyHardware",
+          "name": "Hardware"
+        },
+        {
+          "id": "wendyDisks",
+          "name": "Disks"
+        },
+        {
+          "id": "wendyOperatingSystemCache",
+          "name": "OS Cache"
+        },
+        {
+          "id": "wendyDocumentation",
+          "name": "Documentation"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "wendyDevices.refreshDevices",
+        "title": "Refresh Devices",
+        "icon": "$(refresh)",
+        "category": "Wendy"
+      },
+      {
+        "command": "wendyDevices.addDevice",
+        "title": "Add Device",
+        "icon": "$(add)",
+        "category": "Wendy"
+      },
+      {
+        "command": "wendyDevices.removeDevice",
+        "title": "Remove Device",
+        "icon": "$(trash)",
+        "category": "Wendy"
+      },
+      {
+        "command": "wendyDevices.selectDevice",
+        "title": "Select Device",
+        "category": "Wendy"
+      },
+      {
+        "command": "wendyDevices.unenrollDevice",
+        "title": "Unenroll Device",
+        "icon": "$(circle-slash)",
+        "category": "Wendy"
+      },
+      {
+        "command": "wendyDevices.renameDevice",
+        "title": "Rename Device",
+        "icon": "$(edit)",
+        "category": "Wendy"
+      },
+      {
+        "command": "wendyHardware.watchCamera",
+        "title": "Watch Camera",
+        "icon": "$(eye)",
+        "category": "Wendy"
       }
     ],
-    "taskDefinitions": [
-      {
-        "type": "wendy",
-        "required": [
-          "args"
-        ],
-        "properties": {
-          "args": {
-            "description": "The arguments to pass to the Wendy CLI.",
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "cwd": {
-              "description": "The folder to run the task in.",
-              "type": "string"
-            }
-          }
+    "menus": {
+      "view/title": [
+        {
+          "command": "wendyDevices.refreshDevices",
+          "when": "view == wendyDevices",
+          "group": "navigation"
+        },
+        {
+          "command": "wendyDevices.addDevice",
+          "when": "view == wendyDevices",
+          "group": "navigation"
         }
+      ],
+      "view/item/context": [
+        {
+          "command": "wendyDevices.selectDevice",
+          "when": "view == wendyDevices && viewItem == device",
+          "group": "inline"
+        },
+        {
+          "command": "wendyDevices.renameDevice",
+          "when": "view == wendyDevices && viewItem == device",
+          "group": "inline"
+        },
+        {
+          "command": "wendyDevices.unenrollDevice",
+          "when": "view == wendyDevices && viewItem == device",
+          "group": "device@1"
+        },
+        {
+          "command": "wendyDevices.removeDevice",
+          "when": "view == wendyDevices && viewItem == device",
+          "group": "device@2"
+        },
+        {
+          "command": "wendyHardware.watchCamera",
+          "when": "view == wendyHardware && viewItem == hardwareDevice-camera",
+          "group": "inline"
+        }
+      ]
+    },
+    "jsonValidation": [
+      {
+        "fileMatch": "wendy.json",
+        "url": "./schemas/wendy-schema.json"
       }
     ]
   },
@@ -498,25 +171,21 @@
     "pretest": "npm run compile-tests && npm run compile && npm run lint",
     "check-types": "tsc --noEmit",
     "lint": "eslint src",
-    "test": "vscode-test",
-    "publish:vscode": "bash ./scripts/publish.sh",
-    "publish:openvsx": "npx ovsx publish release/wendy-vscode.vsix --pat $OVSX_PAT",
-    "publish:all": "bash ./scripts/publish.sh"
+    "test": "vscode-test"
   },
   "devDependencies": {
     "@types/mocha": "^10.0.10",
-    "ovsx": "^0.10.1",
     "@types/node": "20.x",
-    "@types/uuid": "^9.0.8",
+    "@types/vscode": "^1.96.0",
     "@typescript-eslint/eslint-plugin": "^8.28.0",
     "@typescript-eslint/parser": "^8.28.0",
-    "eslint": "^9.23.0",
-    "esbuild": "^0.25.1",
-    "npm-run-all": "^4.1.5",
-    "typescript": "^5.8.2",
     "@vscode/test-cli": "^0.0.10",
     "@vscode/test-electron": "^2.4.1",
-    "@types/vscode": "^1.96.0",
-    "uuid": "^11.0.1"
+    "eslint": "^9.23.0",
+    "npm-run-all": "^4.1.5",
+    "typescript": "^5.8.2"
+  },
+  "dependencies": {
+    "esbuild": "^0.25.1"
   }
 }
