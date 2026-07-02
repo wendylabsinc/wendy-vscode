@@ -120,6 +120,33 @@ export class WendyCLI {
     }
     await this.exec(args);
   }
+
+  /**
+   * Renames a device — sets its hostname (and mDNS `.local` name) on the
+   * device itself and updates its asset name in Wendy Cloud (when enrolled).
+   * Delegates entirely to `wendy device rename <name> --device <address>`;
+   * the CLI handles the two-step rename and partial-failure reporting.
+   *
+   * The name must be a valid DNS label: starts with a lowercase letter,
+   * contains only lowercase letters, digits, and hyphens, does not end with a
+   * hyphen, and is at most 63 characters. Validation is enforced by the CLI
+   * (and the agent); this method passes the value through as-is.
+   *
+   * @param deviceAddress Address (hostname or hostname:port) of the device to rename.
+   * @param name New device name (a valid DNS label).
+   * @param cloudGRPC Optional cloud gRPC endpoint override.
+   */
+  public async renameDevice(
+    deviceAddress: string,
+    name: string,
+    cloudGRPC?: string
+  ): Promise<void> {
+    const args = ["device", "rename", name, "--device", deviceAddress];
+    if (cloudGRPC && cloudGRPC.trim() !== "") {
+      args.push("--cloud-grpc", cloudGRPC.trim());
+    }
+    await this.exec(args);
+  }
 }
 
 export interface WendyInfo {
@@ -129,4 +156,41 @@ export interface WendyInfo {
     sdk: string;
     sdkDownloadURL: string;
   };
+}
+
+/**
+ * Validates a device name as a DNS label, mirroring the rule enforced by the
+ * CLI (`validateHostnameArg`) and the agent (`validHostname`):
+ *   - 1–63 characters
+ *   - starts with a lowercase letter
+ *   - contains only lowercase letters, digits, and hyphens
+ *   - does not end with a hyphen
+ *
+ * Returns an error message string when invalid, or `undefined` when valid.
+ * The return type matches the signature expected by `vscode.window.showInputBox`'s
+ * `validateInput` option.
+ */
+export function validateDeviceName(name: string): string | undefined {
+  if (!name || name.length === 0) {
+    return "Name must not be empty.";
+  }
+  if (name.length > 63) {
+    return "Name must be at most 63 characters.";
+  }
+  for (let i = 0; i < name.length; i++) {
+    const c = name[i];
+    const isLower = c >= "a" && c <= "z";
+    const isDigit = c >= "0" && c <= "9";
+    const isHyphen = c === "-";
+    if (!isLower && !isDigit && !isHyphen) {
+      return "Name may only contain lowercase letters, digits, and hyphens.";
+    }
+    if (i === 0 && !isLower) {
+      return "Name must start with a lowercase letter.";
+    }
+  }
+  if (name[name.length - 1] === "-") {
+    return "Name must not end with a hyphen.";
+  }
+  return undefined;
 }
