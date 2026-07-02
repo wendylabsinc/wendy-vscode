@@ -85,6 +85,18 @@
         "category": "Wendy"
       },
       {
+        "command": "wendy.optimizeProject",
+        "title": "Optimize Project",
+        "category": "Wendy",
+        "icon": "$(search)"
+      },
+      {
+        "command": "wendy.optimizeProjectFix",
+        "title": "Optimize Project (Apply Fixes)",
+        "category": "Wendy",
+        "icon": "$(wrench)"
+      },
+      {
         "command": "wendyDevices.addDevice",
         "title": "Add Device",
         "icon": "$(add)"
@@ -225,6 +237,11 @@
       "editor/title": [
         {
           "command": "wendy.openEntitlementsEditor",
+          "when": "resourceFilename == wendy.json",
+          "group": "navigation"
+        },
+        {
+          "command": "wendy.optimizeProject",
           "when": "resourceFilename == wendy.json",
           "group": "navigation"
         }
