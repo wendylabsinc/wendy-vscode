@@ -1,164 +1,173 @@
 import * as vscode from "vscode";
-import { DeviceManager, HardwareDevice } from "../models/DeviceManager";
+import { WendyCLI } from "../wendy-cli/wendy-cli";
 
-class MessageTreeItem extends vscode.TreeItem {
-  constructor(message: string, icon?: string) {
-    super(message, vscode.TreeItemCollapsibleState.None);
-    this.iconPath = new vscode.ThemeIcon(icon || "info");
-    this.contextValue = "message";
-  }
+export interface HardwareDevice {
+  name: string;
+  category: "camera" | "audio" | "other";
+  devicePath?: string;
 }
 
-export class HardwareCategoryTreeItem extends vscode.TreeItem {
-  constructor(
-    public readonly category: string,
-    public readonly devices: HardwareDevice[]
-  ) {
-    super(category, vscode.TreeItemCollapsibleState.Collapsed);
-    this.iconPath = HardwareCategoryTreeItem.getIconForCategory(category);
-    this.contextValue = "hardwareCategory";
-    this.description = `(${devices.length})`;
-  }
-
-  private static getIconForCategory(category: string): vscode.ThemeIcon {
-    switch (category.toLowerCase()) {
-      case 'gpu':
-        return new vscode.ThemeIcon("circuit-board");
-      case 'usb':
-        return new vscode.ThemeIcon("plug");
-      case 'camera':
-        return new vscode.ThemeIcon("device-camera");
-      case 'audio':
-        return new vscode.ThemeIcon("unmute");
-      case 'network':
-        return new vscode.ThemeIcon("globe");
-      case 'storage':
-        return new vscode.ThemeIcon("database");
-      case 'input':
-        return new vscode.ThemeIcon("keyboard");
-      case 'gpio':
-        return new vscode.ThemeIcon("symbol-interface");
-      case 'i2c':
-      case 'spi':
-      case 'serial':
-        return new vscode.ThemeIcon("symbol-misc");
-      default:
-        return new vscode.ThemeIcon("extensions");
-    }
-  }
-}
-
+/**
+ * Tree item representing a hardware device category (Camera, Audio, etc.)
+ * or an individual hardware device entry.
+ */
 export class HardwareDeviceTreeItem extends vscode.TreeItem {
   constructor(
     public readonly hardware: HardwareDevice,
-    public readonly deviceAddress: string
+    public readonly deviceAddress: string,
+    public readonly collapsibleState: vscode.TreeItemCollapsibleState = vscode.TreeItemCollapsibleState.None
   ) {
-    super(hardware.description || hardware.devicePath || '', vscode.TreeItemCollapsibleState.None);
-    if (hardware.category === 'camera') {
-      this.contextValue = 'hardwareDevice-camera';
-    } else if (hardware.category === 'audio') {
-      this.contextValue = 'hardwareDevice-audio';
-    } else {
-      this.contextValue = 'hardwareDevice';
-    }
+    super(hardware.name, collapsibleState);
+    this.tooltip = hardware.devicePath ?? hardware.name;
     this.description = hardware.devicePath;
-    this.tooltip = this.formatTooltip();
-  }
 
-  private formatTooltip(): string {
-    const lines = [this.hardware.description || this.hardware.devicePath || ''];
-    if (this.hardware.devicePath) {
-      lines.push(`Path: ${this.hardware.devicePath}`);
+    if (hardware.category === "camera") {
+      this.contextValue = "hardwareDevice-camera";
+      this.iconPath = new vscode.ThemeIcon("device-camera");
+    } else if (hardware.category === "audio") {
+      this.contextValue = "hardwareDevice-audio";
+      this.iconPath = new vscode.ThemeIcon("mic");
+    } else {
+      this.contextValue = "hardwareDevice";
+      this.iconPath = new vscode.ThemeIcon("circuit-board");
     }
-    if (this.hardware.properties) {
-      for (const [key, value] of Object.entries(this.hardware.properties)) {
-        if (value) {
-          lines.push(`${key}: ${value}`);
-        }
-      }
-    }
-    return lines.join('\n');
   }
 }
 
-type HardwareTreeItem = MessageTreeItem | HardwareCategoryTreeItem | HardwareDeviceTreeItem;
-
-export class HardwareProvider implements vscode.TreeDataProvider<HardwareTreeItem> {
-  private _onDidChangeTreeData = new vscode.EventEmitter<HardwareTreeItem | undefined | null | void>();
+/**
+ * Tree data provider for the Hardware sidebar panel.
+ */
+export class HardwareProvider
+  implements vscode.TreeDataProvider<HardwareDeviceTreeItem>
+{
+  private _onDidChangeTreeData = new vscode.EventEmitter<
+    HardwareDeviceTreeItem | undefined | void
+  >();
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 
-  private hardwareByCategory: Map<string, HardwareDevice[]> | null = null;
-  private loadError: string | null = null;
+  private currentDeviceAddress: string | undefined;
+  private hardwareDevices: HardwareDevice[] = [];
 
-  constructor(private deviceManager: DeviceManager) {
-    // Refresh when current device changes
-    this.deviceManager.onCurrentDeviceChanged(() => {
-      this.hardwareByCategory = null;
-      this.loadError = null;
-      this.refresh();
-    });
+  constructor(private readonly outputChannel: vscode.OutputChannel) {}
 
-    // Also refresh when devices list changes (e.g., after discovery)
-    // This ensures the view updates if the current device wasn't loaded yet
-    this.deviceManager.onDevicesChanged(() => {
-      this.refresh();
-    });
+  setCurrentDevice(address: string | undefined): void {
+    this.currentDeviceAddress = address;
+    this.refresh();
   }
 
   refresh(): void {
-    this.hardwareByCategory = null;
-    this.loadError = null;
     this._onDidChangeTreeData.fire();
   }
 
-  getTreeItem(element: HardwareTreeItem): vscode.TreeItem {
+  getTreeItem(element: HardwareDeviceTreeItem): vscode.TreeItem {
     return element;
   }
 
-  async getChildren(element?: HardwareTreeItem): Promise<HardwareTreeItem[]> {
-    const currentDevice = this.deviceManager.getCurrentDevice();
-    if (!currentDevice) {
-      return [new MessageTreeItem("Select a device to view hardware", "vm")];
-    }
-
-    // Handle category children
-    if (element instanceof HardwareCategoryTreeItem) {
-      return element.devices.map(hw => new HardwareDeviceTreeItem(hw, currentDevice.address));
-    }
-
+  async getChildren(
+    element?: HardwareDeviceTreeItem
+  ): Promise<HardwareDeviceTreeItem[]> {
     if (element) {
       return [];
     }
+    if (!this.currentDeviceAddress) {
+      return [];
+    }
+    return this.hardwareDevices.map(
+      (hw) =>
+        new HardwareDeviceTreeItem(
+          hw,
+          this.currentDeviceAddress!,
+          vscode.TreeItemCollapsibleState.None
+        )
+    );
+  }
 
-    // Root level - fetch and group hardware by category
-    if (!this.hardwareByCategory) {
-      try {
-        const allHardware = await this.deviceManager.getHardware(currentDevice.address);
-        this.hardwareByCategory = new Map();
+  /**
+   * Build the CLI arguments for `wendy device audio listen`, honouring
+   * the new `--buffer-ms` and `--all` flags introduced in CLI PR #1035.
+   */
+  buildAudioListenArgs(
+    deviceAddress: string,
+    deviceId?: number
+  ): string[] {
+    const config = vscode.workspace.getConfiguration("wendyos");
 
-        for (const hw of allHardware) {
-          const category = hw.category || 'other';
-          if (!this.hardwareByCategory.has(category)) {
-            this.hardwareByCategory.set(category, []);
-          }
-          this.hardwareByCategory.get(category)!.push(hw);
-        }
-      } catch (error) {
-        this.loadError = error instanceof Error ? error.message : String(error);
-        return [new MessageTreeItem("Failed to load hardware", "error")];
+    // --buffer-ms: playback jitter-buffer target (default 30, floor 10).
+    const bufferMs: number = Math.max(
+      10,
+      config.get<number>("audio.bufferMs", 30)
+    );
+
+    // --all: include virtual/dummy capture devices in auto-selection.
+    const allDevices: boolean = config.get<boolean>("audio.allDevices", false);
+
+    const args: string[] = [
+      "device",
+      "audio",
+      "listen",
+      "--device",
+      deviceAddress,
+      "--buffer-ms",
+      String(bufferMs),
+    ];
+
+    if (allDevices) {
+      args.push("--all");
+    }
+
+    if (deviceId !== undefined) {
+      args.push("--id", String(deviceId));
+    }
+
+    return args;
+  }
+
+  /**
+   * Open a terminal and run `wendy device audio listen` for the given tree
+   * item. Reads `wendyos.audio.bufferMs` and `wendyos.audio.allDevices` from
+   * VS Code settings and forwards them as `--buffer-ms` / `--all`.
+   */
+  async listenAudioInput(item: HardwareDeviceTreeItem): Promise<void> {
+    const cli = await WendyCLI.create();
+    if (!cli) {
+      vscode.window.showErrorMessage(
+        "Wendy CLI not found. Please install it or set wendyos.cliPath."
+      );
+      return;
+    }
+
+    const address = item.deviceAddress;
+    if (!address) {
+      vscode.window.showErrorMessage(
+        "No device address available. Please select a device first."
+      );
+      return;
+    }
+
+    // Extract a numeric device ID from the device path (e.g. "hw:2,0" → no
+    // simple integer; use undefined and let the CLI auto-select).
+    // If the path ends in a plain integer we forward it as --id.
+    let deviceId: number | undefined;
+    const pathStr = item.hardware.devicePath ?? "";
+    const trailingNum = pathStr.match(/(\d+)$/);
+    if (trailingNum) {
+      const parsed = parseInt(trailingNum[1], 10);
+      if (!isNaN(parsed)) {
+        deviceId = parsed;
       }
     }
 
-    if (this.hardwareByCategory.size === 0) {
-      return [new MessageTreeItem("No hardware detected", "info")];
-    }
+    const args = this.buildAudioListenArgs(address, deviceId);
 
-    // Sort categories alphabetically and create tree items
-    const categories = Array.from(this.hardwareByCategory.keys()).sort();
-    return categories.map(category => {
-      const devices = this.hardwareByCategory!.get(category)!;
-      const displayName = category.charAt(0).toUpperCase() + category.slice(1);
-      return new HardwareCategoryTreeItem(displayName, devices);
+    this.outputChannel.appendLine(
+      `Executing: ${cli.path} ${args.join(" ")}`
+    );
+
+    const terminal = vscode.window.createTerminal({
+      name: `Wendy Audio — ${address}`,
+      shellPath: cli.path,
+      shellArgs: args,
     });
+    terminal.show();
   }
 }

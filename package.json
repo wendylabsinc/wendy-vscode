@@ -385,6 +385,17 @@
           "type": "string",
           "default": null,
           "description": "ID of the currently selected Wendy device"
+        },
+        "wendyos.audio.bufferMs": {
+          "type": "integer",
+          "default": 30,
+          "minimum": 10,
+          "description": "Playback jitter-buffer target in milliseconds for `wendy device audio listen`. Lower values reduce latency but make playback more prone to dropouts on a jittery link. Minimum 10."
+        },
+        "wendyos.audio.allDevices": {
+          "type": "boolean",
+          "default": false,
+          "description": "When listening to audio input, include virtual and dummy capture devices (e.g. Tegra ADMAIF, HDMI loopback) in the microphone selection pool. Equivalent to passing `--all` to `wendy device audio listen`."
         }
       }
     },
